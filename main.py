@@ -19,6 +19,15 @@ app = FastAPI(
     title="Open Minds Daily Report Designer"
 )
 
+# Allow the GitHub Pages Daily Report frontend to call this Render API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://abhijeetraj22.github.io"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://abhijeetraj22.github.io"],
@@ -117,9 +126,17 @@ def _is_authenticated(request: Request) -> bool:
     if not AUTH_PASSWORD:
         return False
 
-    return _valid_auth_token(
-        request.cookies.get(AUTH_COOKIE)
-    )
+    # Render-hosted UI uses the normal HttpOnly cookie.
+    if _valid_auth_token(request.cookies.get(AUTH_COOKIE)):
+        return True
+
+    # GitHub Pages uses a short-lived bearer token returned by /verify-code.
+    authorization = request.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        return _valid_auth_token(token)
+
+    return False
 
 
 LOGIN_PAGE = """
@@ -320,6 +337,35 @@ async def verify_code(request: Request):
         path="/",
     )
     return response
+
+
+@app.post("/verify-code")
+async def verify_code(request: Request):
+    """Verify the GitHub Pages secure code and return a signed short-lived token."""
+    if not AUTH_PASSWORD:
+        return Response(
+            content='{"status":"error","message":"Authentication is not configured."}',
+            status_code=503,
+            media_type="application/json",
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    code = str(payload.get("code", "")).strip()
+    if not hmac.compare_digest(code, AUTH_PASSWORD):
+        return Response(
+            content='{"status":"error","message":"Incorrect secure code."}',
+            status_code=401,
+            media_type="application/json",
+        )
+
+    return {
+        "status": "success",
+        "token": _make_auth_token(),
+    }
 
 
 @app.get("/logout")
