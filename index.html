@@ -2467,7 +2467,7 @@
         try {
           const response = await nativeFetch(REPORT_SERVER + "/verify-code", {
             method: "POST",
-            credentials: "include",
+            credentials: "omit",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ code })
           });
