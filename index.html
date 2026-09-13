@@ -2260,10 +2260,10 @@
                 <div class="logo-wrapper">
                   <img
                     class="school-logo-image"
-                    src="/static/images/school-logo.jpg"
+                    src="https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.jpg"
                     onerror="
                       this.onerror = null;
-                      this.src = '/static/images/school-logo.png';
+                      this.src = 'https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.png';
                     "
                     alt="Open Minds School Logo"
                   />
@@ -2280,7 +2280,7 @@
                 <div class="header-art">
                   <img
                     class="header-art-image"
-                    src="/static/images/header-art.png"
+                    src="https://abhijeetraj22.github.io/daily_report_live/static/images/header-art.png"
                     alt="Clipboard books and pen"
                   />
                 </div>
@@ -2683,24 +2683,34 @@
         }
 
         try {
-          const response = await fetch("/api/icons/svg", {
-            method: "POST",
+          /*
+           * Icons are public artwork, so load them directly from Iconify.
+           * This avoids protected Render API/CORS authentication for icons
+           * and makes icons work identically on Render and GitHub Pages.
+           */
+          let name = String(iconName || "").trim();
+          if (!name) return "";
 
-            headers: {
-              "Content-Type": "application/json",
-            },
+          if (!name.includes(":")) {
+            name = "mdi:" + name;
+          }
 
-            body: JSON.stringify({
-              name: iconName,
-            }),
-          });
+          const encodedName = encodeURIComponent(name);
+          const response = await nativeFetch(
+            "https://api.iconify.design/" +
+            encodedName +
+            ".svg?height=1em&width=1em"
+          );
 
-          const data = await response.json();
+          if (!response.ok) {
+            throw new Error("Iconify HTTP " + response.status);
+          }
 
-          if (data.svg) {
-            state.iconCache[iconName] = data.svg;
+          const svg = await response.text();
 
-            return data.svg;
+          if (svg && svg.includes("<svg")) {
+            state.iconCache[iconName] = svg;
+            return svg;
           }
         } catch (error) {
           console.error("Icon SVG error:", error);
