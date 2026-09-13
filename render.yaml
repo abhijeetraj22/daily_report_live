@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: daily-report-s9yq
+    runtime: python
+
+    buildCommand: pip install -r requirements.txt
+
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /health
+
+    autoDeploy: true
