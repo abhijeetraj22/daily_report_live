@@ -205,7 +205,7 @@ LOGIN_PAGE = """
     <div class="brand">OPEN MINDS • DAILY REPORT</div>
     <h1>Secure Access</h1>
     <p>Enter the password to open the Daily Report Designer.</p>
-    {error}
+    __ERROR__
     <form method="post" action="/login">
       <label for="password">Password</label>
       <input id="password" name="password" type="password"
@@ -228,7 +228,7 @@ async def login_page():
             status_code=503,
         )
 
-    return HTMLResponse(LOGIN_PAGE.format(error=""))
+    return HTMLResponse(LOGIN_PAGE.replace("__ERROR__", ""))
 
 
 @app.post("/login")
@@ -247,13 +247,13 @@ async def login(request: Request):
     )
     password = form.get("password", [""])[0]
 
-    if not hmac.compare_digest(password, AUTH_PASSWORD):
-        return HTMLResponse(
-            LOGIN_PAGE.format(
-                error='<div class="error">Incorrect password. Please try again.</div>'
-            ),
-            status_code=401,
-        )
+    return HTMLResponse(
+        LOGIN_PAGE.replace(
+            "__ERROR__",
+            '<div class="error">Incorrect password. Please try again.</div>'
+        ),
+        status_code=401,
+    )
 
     response = RedirectResponse(
         url="/",
