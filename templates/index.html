@@ -1,0 +1,4103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Daily Report</title>
+
+    <!-- ============================================================
+         FONTS
+    ============================================================ -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;500;600;700;800&family=Roboto+Slab:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- ============================================================
+         HTML2CANVAS
+    ============================================================ -->
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <style>
+      /* ============================================================
+           ROOT
+        ============================================================ */
+
+      :root {
+        --navy: #173f73;
+        --navy-dark: #10345f;
+        --navy-light: #285d93;
+
+        --red: #c72027;
+
+        --yellow: #f7ca38;
+        --yellow-light: #ffd95a;
+
+        --paper: #fffef9;
+
+        --line: #8d99a4;
+
+        --body: #161b20;
+      }
+
+      /* ============================================================
+           RESET
+        ============================================================ */
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: #edf1f4;
+        color: var(--body);
+
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      /* ============================================================
+           APPLICATION BAR
+        ============================================================ */
+
+      .app-bar {
+        position: sticky;
+        top: 0;
+        z-index: 10000;
+
+        min-height: 52px;
+
+        padding: 11px 18px;
+
+        display: flex;
+        align-items: center;
+
+        color: white;
+
+        background: linear-gradient(90deg, #0b2e58, #1e5084);
+
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+      }
+
+      .app-title {
+        font-size: 17px;
+        font-weight: 800;
+      }
+
+      .app-description {
+        margin-left: auto;
+
+        font-size: 12px;
+
+        opacity: 0.82;
+      }
+
+      /* ============================================================
+           WORKSPACE
+        ============================================================ */
+
+      .workspace {
+        width: min(1500px, calc(100% - 32px));
+
+        margin: 20px auto;
+
+        display: grid;
+
+        grid-template-columns:
+          430px
+          minmax(700px, 1fr);
+
+        gap: 20px;
+      }
+
+      /* ============================================================
+           PANEL
+        ============================================================ */
+
+      .panel {
+        background: white;
+
+        border: 1px solid #d1dce6;
+
+        border-radius: 17px;
+
+        overflow: hidden;
+
+        box-shadow: 0 15px 40px rgba(20, 50, 80, 0.12);
+      }
+
+      .panel-heading {
+        padding: 14px 17px;
+
+        color: white;
+
+        background: linear-gradient(90deg, #123a69, #2c669e);
+
+        font-size: 16px;
+        font-weight: 800;
+      }
+
+      .panel-content {
+        padding: 16px;
+      }
+
+      /* ============================================================
+           FORM
+        ============================================================ */
+
+      .form-grid {
+        display: grid;
+
+        grid-template-columns:
+          1fr
+          1fr;
+
+        gap: 10px;
+      }
+
+      .form-field {
+        margin-bottom: 13px;
+      }
+
+      .form-field label {
+        display: block;
+
+        margin-bottom: 6px;
+
+        color: #4d6680;
+
+        font-size: 11px;
+
+        font-weight: 800;
+
+        text-transform: uppercase;
+
+        letter-spacing: 0.45px;
+      }
+
+      .form-field input,
+      .form-field textarea {
+        width: 100%;
+
+        padding: 10px 11px;
+
+        border: 1px solid #c8d5e0;
+
+        border-radius: 9px;
+
+        outline: none;
+
+        background: #fbfdff;
+      }
+
+      .form-field textarea {
+        min-height: 410px;
+
+        resize: vertical;
+
+        line-height: 1.45;
+      }
+
+      #day[readonly] {
+        cursor: not-allowed;
+        background: #eef3f7;
+        color: #52697d;
+      }
+
+      #date {
+        cursor: pointer;
+      }
+
+      .form-field input:focus,
+      .form-field textarea:focus {
+        border-color: #557ca3;
+
+        box-shadow: 0 0 0 3px rgba(85, 124, 163, 0.12);
+      }
+
+      /* ============================================================
+           BUTTONS
+        ============================================================ */
+
+      .actions {
+        display: flex;
+
+        flex-wrap: wrap;
+
+        gap: 8px;
+      }
+
+      .btn {
+        border: 0;
+
+        border-radius: 9px;
+
+        padding: 10px 14px;
+
+        cursor: pointer;
+
+        font-weight: 800;
+      }
+
+      .btn-primary {
+        color: white;
+
+        background: var(--navy);
+      }
+
+      .btn-gold {
+        color: #172b40;
+
+        background: var(--yellow);
+      }
+
+      .btn-secondary {
+        color: var(--navy);
+
+        background: #e7eff6;
+      }
+
+      .btn:disabled {
+        opacity: 0.65;
+
+        cursor: wait;
+      }
+
+      .help-box {
+        margin-top: 12px;
+
+        padding: 11px 12px;
+
+        border-radius: 10px;
+
+        color: #5d7389;
+
+        background: #f1f6fa;
+
+        font-size: 11px;
+
+        line-height: 1.5;
+      }
+
+      /* ============================================================
+           PREVIEW
+        ============================================================ */
+
+      .preview {
+        padding: 12px;
+
+        background: #e9edf0;
+
+        overflow-x: auto;
+        overflow-y: visible;
+      }
+
+      /* ============================================================
+           REPORT
+
+           IMPORTANT:
+           The reference design is based on a fixed 1250px canvas.
+           Do NOT use percentage widths for the report itself.
+        ============================================================ */
+
+      .report {
+        position: relative;
+
+        width: 1250px;
+        min-width: 1250px;
+        max-width: 1250px;
+
+        margin: 0 auto;
+
+        background: var(--paper);
+
+        border: 3px solid var(--navy);
+
+        border-radius: 15px;
+
+        box-shadow: 0 18px 45px rgba(15, 43, 72, 0.16);
+
+        overflow: visible;
+      }
+
+      .report::before {
+        content: "";
+
+        position: absolute;
+
+        inset: 6px;
+
+        border: 1px solid #6e879f;
+
+        border-radius: 10px;
+
+        pointer-events: none;
+
+        z-index: 1;
+      }
+
+      /* ============================================================
+           REPORT HEADER
+
+           Header geometry corresponds to the supplied reference.
+        ============================================================ */
+
+      .report-header {
+        position: relative;
+
+        width: 100%;
+
+        height: 212px;
+
+        margin: 0;
+        padding: 0;
+
+        overflow: visible;
+
+        z-index: 50;
+      }
+
+      /* ============================================================
+           TOP HEADER
+        ============================================================ */
+
+      .header-top {
+        position: relative;
+
+        width: 100%;
+
+        height: 91px;
+
+        margin: 0;
+        padding: 0;
+
+        display: block;
+
+        overflow: visible;
+      }
+
+      /* ============================================================
+           TOP LEFT SCHOOL LOGO
+        ============================================================ */
+
+      .logo-wrapper {
+        position: absolute;
+
+        left: 0;
+        top: 0;
+
+        width: 171px;
+        height: 141px;
+
+        margin: 0;
+        padding: 0;
+
+        display: flex;
+
+        align-items: flex-start;
+        justify-content: flex-start;
+
+        overflow: visible;
+
+        z-index: 5000;
+      }
+
+      .school-logo-image {
+        display: block;
+
+        width: 171px;
+        height: 141px;
+
+        max-width: none;
+        max-height: none;
+
+        margin: 0;
+        padding: 0;
+
+        object-fit: contain;
+
+        object-position: left top;
+
+        visibility: visible;
+        opacity: 1;
+      }
+
+      /* ============================================================
+           SCHOOL NAME
+        ============================================================ */
+
+      .school-heading {
+        position: absolute;
+
+        left: 184px;
+        right: 181px;
+
+        top: 35px;
+
+        width: auto;
+        max-width: none;
+
+        margin: 0;
+        padding: 0;
+
+        color: var(--navy);
+
+        font-family: "Roboto Condensed", Arial, Helvetica, sans-serif;
+
+        font-size: 41px;
+
+        font-weight: 800;
+
+        line-height: 1;
+
+        /* Increase width only; keep the same font height. */
+        transform: scaleX(1.065) scaleY(1.55);
+        transform-origin: center center;
+
+        letter-spacing: -0.65px;
+
+        text-align: center;
+
+        white-space: nowrap;
+
+        overflow: visible;
+
+        z-index: 100;
+      }
+
+      /* ============================================================
+           TOP RIGHT ARTWORK
+        ============================================================ */
+
+      .header-art {
+        position: absolute;
+
+        right: 0;
+        top: 0;
+
+        width: 177px;
+        height: 145px;
+
+        margin: 0;
+        padding: 0;
+
+        display: flex;
+
+        align-items: flex-start;
+        justify-content: flex-end;
+
+        overflow: visible;
+
+        z-index: 5000;
+      }
+
+      .header-art-image {
+        display: block;
+
+        width: 177px;
+        height: 145px;
+
+        max-width: none;
+        max-height: none;
+
+        margin: 0;
+        padding: 0;
+
+        object-fit: contain;
+
+        object-position: right top;
+
+        visibility: visible;
+        opacity: 1;
+      }
+
+      /* ============================================================
+           DECORATIVE HEADER LINE
+        ============================================================ */
+
+      .header-divider {
+        position: relative;
+
+        width: auto;
+
+        height: 23px;
+
+        margin: 0 55px;
+
+        padding: 0;
+
+        overflow: visible;
+
+        z-index: 30;
+      }
+
+      .header-divider::before {
+        content: "";
+
+        position: absolute;
+
+        left: 0;
+        right: 0;
+
+        top: 11px;
+
+        height: 1.5px;
+
+        background: #9fb1c1;
+      }
+
+      /* ============================================================
+           OLD SIDE DECORATION IS HIDDEN
+
+           The reference uses the center diamond pattern.
+        ============================================================ */
+
+      .divider-left,
+      .divider-right {
+        display: none;
+      }
+
+      /* ============================================================
+           CENTER DIAMONDS
+        ============================================================ */
+
+      .divider-center {
+        position: absolute;
+
+        left: 50%;
+        top: 4px;
+
+        transform: translateX(-50%);
+
+        display: flex;
+
+        align-items: center;
+        justify-content: center;
+
+        gap: 9px;
+
+        padding: 0 8px;
+
+        background: var(--paper);
+
+        z-index: 100;
+      }
+
+      .divider-dot {
+        width: 5px;
+        height: 5px;
+
+        border-radius: 50%;
+
+        background: var(--navy);
+      }
+
+      .diamond {
+        width: 11px;
+        height: 11px;
+
+        transform: rotate(45deg);
+
+        background: var(--navy);
+
+        border: 1px solid var(--navy);
+      }
+
+      .diamond-orange {
+        background: #e45621;
+
+        border-color: #e45621;
+      }
+
+      /* ============================================================
+           DAILY REPORT
+        ============================================================ */
+
+      .daily-report-line {
+        position: relative;
+
+        width: 100%;
+
+        height: 52px;
+        min-height: 52px;
+
+        margin: 0;
+        padding: 0;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        flex-wrap: nowrap;
+
+        z-index: 100;
+      }
+
+      .daily-pill {
+        height: 48px;
+
+        margin: 0;
+        padding: 0 22px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        border-radius: 25px 0 0 25px;
+
+        color: white;
+        background: linear-gradient(90deg, #163c6d, #285f96);
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+        font-size: 30px;
+        font-weight: 800;
+        line-height: 1;
+
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      .department-text {
+        margin: 0;
+
+        padding: 0 0 0 9px;
+
+        color: var(--red);
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 27px;
+
+        font-weight: 800;
+
+        line-height: 1;
+
+        white-space: nowrap;
+      }
+
+      /* ============================================================
+           DAY / DATE ROW
+
+           Reference proportions:
+           ~362px each.
+
+           They are deliberately NOT percentage-width blocks.
+        ============================================================ */
+
+      .meta-row {
+        position: relative;
+
+        width: 100%;
+
+        height: 45px;
+
+        margin: 2px 6px 5px;
+
+        padding: 0;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: space-between;
+
+        gap: 0;
+
+        z-index: 1000;
+      }
+
+      /* ============================================================
+           DAY / DATE BLOCK
+        ============================================================ */
+
+      .meta-group {
+        width: 250px;
+
+        min-width: 250px;
+        max-width: 250px;
+
+        height: 41px;
+
+        flex: 0 0 250px;
+
+        margin: 0;
+        padding: 0;
+
+        display: flex;
+
+        align-items: center;
+
+        overflow: hidden;
+
+        border: 1px solid #b8d0e2;
+
+        border-radius: 9px;
+
+        background: #eef7fd;
+
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+      }
+
+      .meta-day {
+        width: 240px;
+        min-width: 240px;
+        max-width: 240px;
+        flex: 0 0 240px;
+        margin-left: 5px;
+      }
+
+      .meta-date {
+        width: 250px;
+        min-width: 250px;
+        max-width: 250px;
+        flex: 0 0 250px;
+        margin-right: 20px;
+      }
+
+      /* ============================================================
+           CALENDAR BLOCK
+        ============================================================ */
+
+      .calendar {
+        width: 44px;
+        min-width: 44px;
+        max-width: 44px;
+
+        height: 41px;
+
+        flex: 0 0 44px;
+
+        display: grid;
+
+        place-items: center;
+
+        margin: 0;
+        padding: 0;
+
+        border-radius: 8px 0 0 8px;
+
+        color: white;
+
+        background: var(--navy);
+
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      .calendar svg {
+        width: 24px;
+        height: 24px;
+
+        display: block;
+
+        fill: currentColor;
+      }
+
+      /* ============================================================
+           DAY / DATE LABEL
+        ============================================================ */
+
+      .meta-label {
+        height: 100%;
+
+        display: flex;
+
+        align-items: center;
+
+        padding: 0 8px;
+
+        color: var(--navy);
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 22px;
+
+        font-weight: 800;
+
+        white-space: nowrap;
+      }
+
+      /* ============================================================
+           DAY / DATE VALUE
+        ============================================================ */
+
+      .meta-value {
+        height: 31px;
+
+        min-width: 0;
+
+        margin: 0 4px 0 0;
+
+        padding: 0 12px;
+
+        display: flex;
+
+        align-items: center;
+
+        color: var(--navy);
+
+        background: #dceefb;
+
+        border: none;
+
+        border-radius: 16px;
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 22px;
+
+        font-weight: 800;
+
+        line-height: 1;
+
+        white-space: nowrap;
+      }
+
+      /* ============================================================
+           TABLE
+        ============================================================ */
+
+      .report-table {
+        position: relative;
+
+        z-index: 100;
+
+        margin: 0 10px 11px;
+
+        overflow: hidden;
+
+        border: 1px solid #7d8993;
+
+        border-radius: 10px;
+
+        background: white;
+      }
+
+      /* ============================================================
+           TABLE HEADER
+
+           SL.NO | DESCRIPTION | REMARKS
+
+           Description covers the ICON + DESCRIPTION body area.
+        ============================================================ */
+
+      .table-header {
+        height: 42px;
+
+        display: grid;
+
+        grid-template-columns:
+          65px
+          minmax(0, 1fr)
+          240px;
+
+        border-bottom: 1px solid #7d8993;
+
+        background: var(--yellow);
+      }
+
+      .table-sl {
+        display: flex;
+
+        align-items: center;
+        justify-content: center;
+
+        color: white;
+
+        background: var(--navy);
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 22px;
+
+        font-weight: 800;
+
+        border-right: 1px solid #6e7983;
+      }
+
+      .table-title {
+        position: relative;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        color: #182e47;
+
+        background: linear-gradient(90deg, #7dc7ff, #7dc7ff);
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 25px;
+
+        font-weight: 800;
+
+        line-height: 1;
+
+        white-space: nowrap;
+
+        overflow: hidden;
+      }
+
+      .table-title-text {
+        position: relative;
+
+        z-index: 20;
+
+        display: block;
+
+        white-space: nowrap;
+
+        transform: none !important;
+
+        rotate: none !important;
+      }
+
+      /* ============================================================
+           DESCRIPTION ARROWS
+        ============================================================ */
+
+      /* ============================================================
+   DESCRIPTION LEAF / FEATHER DECORATION
+   ============================================================ */
+
+      .task-decoration {
+        position: absolute;
+        top: 50%;
+        width: 42px;
+        height: 32px;
+
+        transform: translateY(-50%);
+
+        z-index: 10;
+        pointer-events: none;
+      }
+
+      /* LEFT SIDE — leaves point toward DESCRIPTION */
+      .task-decoration.left {
+        left: 38%;
+      }
+
+      /* RIGHT SIDE — leaves point toward DESCRIPTION */
+      .task-decoration.right {
+        right: 38%;
+      }
+
+      /* Individual leaf */
+      .task-decoration span {
+        position: absolute;
+
+        width: 25px;
+        height: 6px;
+
+        background: #183d69;
+
+        border-radius: 100% 15% 15% 100%;
+
+        transform-origin: left center;
+      }
+
+      /* ============================================================
+   LEFT THREE LEAVES
+   ============================================================ */
+
+      .task-decoration.left span:nth-child(1) {
+        left: 0;
+        top: 2px;
+
+        transform: rotate(32deg);
+      }
+
+      .task-decoration.left span:nth-child(2) {
+        left: 0;
+        top: 13px;
+
+        transform: rotate(0deg);
+      }
+
+      .task-decoration.left span:nth-child(3) {
+        left: 0;
+        top: 24px;
+
+        transform: rotate(-32deg);
+      }
+
+      /* ============================================================
+   RIGHT THREE LEAVES
+   ============================================================ */
+
+      .task-decoration.right span {
+        transform-origin: right center;
+        border-radius: 15% 100% 100% 15%;
+      }
+
+      .task-decoration.right span:nth-child(1) {
+        right: 0;
+        top: 2px;
+
+        transform: rotate(-32deg);
+      }
+
+      .task-decoration.right span:nth-child(2) {
+        right: 0;
+        top: 13px;
+
+        transform: rotate(0deg);
+      }
+
+      .task-decoration.right span:nth-child(3) {
+        right: 0;
+        top: 24px;
+
+        transform: rotate(32deg);
+      }
+      /* ============================================================
+           SECTION HEADER
+        ============================================================ */
+
+      .section-header {
+        min-height: 28px;
+        height: 28px;
+
+        display: flex;
+
+        align-items: center;
+
+        padding: 0 13px 0 65px;
+
+        color: var(--navy);
+
+        background: linear-gradient(90deg, #edf3f8, #f9fbfd);
+
+        border-bottom: 1px solid #9da7ae;
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 22px;
+
+        font-weight: 800;
+
+        text-transform: uppercase;
+
+        letter-spacing: 0.65px;
+      }
+
+      /* ============================================================
+           TASK ROW
+
+           SL.NO | ICON | DESCRIPTION | REMARKS
+        ============================================================ */
+
+      .task-row {
+        min-height: 67px;
+
+        display: grid;
+
+        grid-template-columns:
+          65px
+          75px
+          minmax(0, 1fr)
+          240px;
+
+        background: linear-gradient(90deg, #fffefa, #fffcf4);
+
+        border-bottom: 1px solid #9ca5ac;
+
+        break-inside: avoid;
+
+        page-break-inside: avoid;
+      }
+
+      .task-row:last-child {
+        border-bottom: none;
+      }
+
+      /* ============================================================
+           NUMBER CELL
+        ============================================================ */
+
+      .number-cell {
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+      }
+
+      .number-box {
+        width: 45px;
+        height: 45px;
+
+        position: relative;
+
+        display: grid;
+
+        place-items: center;
+
+        border-radius: 7px;
+
+        color: white;
+
+        background: var(--navy);
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 25px;
+
+        font-weight: 800;
+      }
+
+      .number-box::after {
+        content: "";
+
+        position: absolute;
+
+        inset: 7px;
+
+        border: 1px solid rgba(255, 255, 255, 0.38);
+
+        border-radius: 3px;
+      }
+
+      /* ============================================================
+           ICON CELL
+        ============================================================ */
+
+      .icon-cell {
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        border-left: 1px solid #9ba5ad;
+
+        border-right: 1px solid #9ba5ad;
+      }
+
+      /* ============================================================
+           ICON BUTTON
+        ============================================================ */
+
+      .task-icon {
+        width: 50px;
+        height: 50px;
+
+        min-width: 50px;
+        min-height: 50px;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        padding: 0;
+
+        border: none;
+
+        border-radius: 50%;
+
+        color: white;
+
+        cursor: pointer;
+
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+      }
+
+      .task-icon svg {
+        width: 31px;
+        height: 31px;
+
+        display: block;
+
+        fill: currentColor;
+
+        color: white;
+      }
+
+      /* ============================================================
+           TASK TEXT
+        ============================================================ */
+
+      .task-text {
+        min-width: 0;
+
+        display: flex;
+
+        align-items: center;
+
+        padding: 8px 12px;
+
+        color: #171c21;
+
+        font-family: "Roboto Slab", Georgia, "Times New Roman", serif;
+
+        font-size: 21px;
+
+        font-weight: 600;
+
+        line-height: 1.18;
+      }
+
+      .task-text span {
+        display: block;
+
+        width: 100%;
+
+        overflow-wrap: anywhere;
+      }
+
+      /* ============================================================
+           REMARKS
+        ============================================================ */
+
+      .table-remarks {
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        color: white;
+
+        background: var(--navy);
+
+        font-family: "Roboto Condensed", Arial, sans-serif;
+
+        font-size: 23px;
+
+        font-weight: 800;
+
+        border-left: 1px solid #6e7983;
+
+        letter-spacing: 0.2px;
+      }
+
+      .remark-cell {
+        min-width: 0;
+        min-height: 100%;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 8px 10px;
+
+        border-left: 1px solid #9ba5ad;
+
+        background: #fffefb;
+
+        color: #171c21;
+
+        font-family: "Roboto Slab", Georgia, "Times New Roman", serif;
+
+        font-size: 20px;
+
+        font-weight: 600;
+
+        line-height: 1.15;
+
+        text-align: center;
+
+        overflow-wrap: anywhere;
+      }
+
+      /* ============================================================
+           ICON MODAL
+        ============================================================ */
+
+      .icon-modal {
+        position: fixed;
+
+        inset: 0;
+
+        z-index: 50000;
+
+        display: none;
+
+        align-items: center;
+
+        justify-content: center;
+
+        padding: 20px;
+
+        background: rgba(5, 22, 40, 0.64);
+      }
+
+      .icon-modal.open {
+        display: flex;
+      }
+
+      .icon-dialog {
+        width: min(1000px, 96vw);
+
+        height: min(82vh, 760px);
+
+        display: flex;
+
+        flex-direction: column;
+
+        overflow: hidden;
+
+        border-radius: 18px;
+
+        background: white;
+
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+      }
+
+      .icon-toolbar {
+        display: flex;
+
+        gap: 8px;
+
+        padding: 12px;
+
+        border-bottom: 1px solid #d3dee8;
+      }
+
+      .icon-search {
+        flex: 1;
+
+        padding: 10px 11px;
+
+        border: 1px solid #c9d5df;
+
+        border-radius: 9px;
+
+        outline: none;
+      }
+
+      .icon-grid {
+        flex: 1;
+
+        overflow: auto;
+
+        display: grid;
+
+        grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+
+        gap: 10px;
+
+        padding: 14px;
+      }
+
+      .icon-option {
+        padding: 10px 5px;
+
+        border: 1px solid #d3dee8;
+
+        border-radius: 11px;
+
+        background: #fbfdff;
+
+        cursor: pointer;
+
+        text-align: center;
+      }
+
+      .icon-option:hover {
+        border-color: #587fa4;
+
+        background: #edf5ff;
+      }
+
+      .icon-option svg {
+        width: 34px;
+        height: 34px;
+
+        color: var(--navy);
+
+        fill: currentColor;
+      }
+
+      .icon-option small {
+        display: block;
+
+        margin-top: 5px;
+
+        color: #60758a;
+
+        font-size: 9px;
+
+        white-space: nowrap;
+
+        overflow: hidden;
+
+        text-overflow: ellipsis;
+      }
+
+      /* ============================================================
+           SCREEN PREVIEW
+
+           Keep report geometry fixed.
+           The preview itself scrolls horizontally if necessary.
+        ============================================================ */
+
+      @media screen and (max-width: 1050px) {
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .preview {
+          overflow-x: auto;
+        }
+
+        .report {
+          margin-left: 0;
+          margin-right: 0;
+        }
+      }
+
+      /* ============================================================
+           IMPORTANT:
+           Do NOT resize the actual report at narrow browser widths.
+        ============================================================ */
+
+      @media screen and (max-width: 760px) {
+        .preview {
+          overflow-x: auto;
+        }
+
+        .report {
+          width: 1250px;
+          min-width: 1250px;
+          max-width: 1250px;
+        }
+      }
+
+      /* ============================================================
+           PNG EXPORT MODE
+        ============================================================ */
+
+      .png-exporting .report {
+        box-shadow: none !important;
+      }
+      /* ============================================================
+   WATERMARK ID — 5793
+   CENTERED BETWEEN DAY AND DATE
+   ============================================================ */
+
+      /* ============================================================
+   WATERMARK ID
+   CENTERED BETWEEN DAY AND DATE
+   EXPORT-SAFE
+   ============================================================ */
+
+      .watermarkId {
+        position: static !important;
+
+        flex: 0 0 auto !important;
+
+        display: flex !important;
+
+        align-items: center !important;
+        justify-content: center !important;
+
+        width: auto !important;
+        height: 41px !important;
+
+        margin: 0 auto !important;
+        padding: 0 8px !important;
+
+        font-family: "Book Antiqua", Palatino, serif !important;
+        font-size: 35px !important;
+        font-weight: 700 !important;
+
+        line-height: 1 !important;
+
+        color: rgba(0, 0, 0, 0.15) /* transparent effect */ !important;
+
+        white-space: nowrap !important;
+
+        pointer-events: none !important;
+
+        z-index: 20 !important;
+      }
+      /* ============================================================
+           PRINT / PDF
+
+           A4 LANDSCAPE
+        ============================================================ */
+
+      @media print {
+        @page {
+          size: A4 landscape;
+          margin: 0;
+        }
+
+        html,
+        body {
+          width: 297mm !important;
+
+          min-width: 297mm !important;
+
+          margin: 0 !important;
+          padding: 0 !important;
+
+          background: white !important;
+
+          -webkit-print-color-adjust: exact !important;
+
+          print-color-adjust: exact !important;
+        }
+
+        body {
+          overflow: visible !important;
+        }
+
+        /* --------------------------------------------------------
+               HIDE EDITOR
+            -------------------------------------------------------- */
+
+        .app-bar,
+        .editor-panel,
+        .preview-panel > .panel-heading {
+          display: none !important;
+        }
+
+        /* --------------------------------------------------------
+               WORKSPACE
+            -------------------------------------------------------- */
+
+        .workspace {
+          display: block !important;
+
+          width: 297mm !important;
+
+          min-width: 297mm !important;
+
+          max-width: 297mm !important;
+
+          margin: 0 !important;
+
+          padding: 0 !important;
+        }
+
+        .preview {
+          width: 297mm !important;
+
+          min-width: 297mm !important;
+
+          padding: 0 !important;
+
+          margin: 0 !important;
+
+          background: white !important;
+
+          overflow: visible !important;
+        }
+
+        /* --------------------------------------------------------
+               REPORT
+            -------------------------------------------------------- */
+
+        .report {
+          width: 297mm !important;
+
+          min-width: 297mm !important;
+
+          max-width: 297mm !important;
+
+          margin: 0 !important;
+
+          border: 1mm solid var(--navy) !important;
+
+          border-radius: 3mm !important;
+
+          box-shadow: none !important;
+
+          overflow: visible !important;
+        }
+
+        .report::before {
+          inset: 1.5mm !important;
+
+          border: 0.3mm solid #71879b !important;
+
+          border-radius: 2mm !important;
+        }
+
+        /* --------------------------------------------------------
+               HEADER
+            -------------------------------------------------------- */
+
+        .report-header {
+          width: 100% !important;
+
+          height: 50.3mm !important;
+
+          padding: 0 !important;
+
+          overflow: visible !important;
+        }
+
+        /* --------------------------------------------------------
+               TOP HEADER
+            -------------------------------------------------------- */
+
+        .header-top {
+          width: 100% !important;
+
+          height: 21.7mm !important;
+
+          position: relative !important;
+
+          overflow: visible !important;
+        }
+
+        /* --------------------------------------------------------
+               LEFT LOGO
+            -------------------------------------------------------- */
+
+        .logo-wrapper {
+          left: 0 !important;
+
+          top: 0 !important;
+
+          width: 40.6mm !important;
+
+          height: 33.5mm !important;
+
+          z-index: 5000 !important;
+        }
+
+        .school-logo-image {
+          width: 40.6mm !important;
+
+          height: 33.5mm !important;
+
+          max-width: none !important;
+
+          max-height: none !important;
+
+          object-fit: contain !important;
+
+          object-position: left top !important;
+
+          display: block !important;
+
+          visibility: visible !important;
+
+          opacity: 1 !important;
+        }
+
+        /* --------------------------------------------------------
+               SCHOOL NAME
+            -------------------------------------------------------- */
+
+        .school-heading {
+          left: 43.5mm !important;
+
+          right: 46mm !important;
+
+          top: 4.5mm !important;
+
+          width: auto !important;
+
+          max-width: none !important;
+
+          padding: 0 !important;
+
+          font-size: 10.1mm !important;
+
+          line-height: 1 !important;
+
+          /* Width only: do not increase the vertical font size. */
+          transform: scaleX(1.065) !important;
+          transform-origin: center center !important;
+
+          letter-spacing: -0.16mm !important;
+
+          white-space: nowrap !important;
+
+          overflow: visible !important;
+        }
+
+        /* --------------------------------------------------------
+               RIGHT ART
+            -------------------------------------------------------- */
+
+        .header-art {
+          right: 0 !important;
+
+          top: 0 !important;
+
+          width: 42mm !important;
+
+          height: 34.8mm !important;
+
+          z-index: 5000 !important;
+        }
+
+        .header-art-image {
+          width: 42mm !important;
+
+          height: 34.8mm !important;
+
+          max-width: none !important;
+
+          max-height: none !important;
+
+          object-fit: contain !important;
+
+          object-position: right top !important;
+
+          display: block !important;
+
+          visibility: visible !important;
+
+          opacity: 1 !important;
+        }
+
+        /* --------------------------------------------------------
+               DIVIDER
+            -------------------------------------------------------- */
+
+        .header-divider {
+          height: 6mm !important;
+
+          margin: 0 13mm !important;
+        }
+
+        .header-divider::before {
+          top: 3mm !important;
+
+          height: 0.35mm !important;
+        }
+
+        .divider-center {
+          top: 1mm !important;
+
+          gap: 2.4mm !important;
+
+          padding: 0 2mm !important;
+        }
+
+        .divider-dot {
+          width: 1.2mm !important;
+
+          height: 1.2mm !important;
+        }
+
+        .diamond {
+          width: 3mm !important;
+
+          height: 3mm !important;
+        }
+
+        /* --------------------------------------------------------
+               DAILY REPORT
+            -------------------------------------------------------- */
+
+        .daily-report-line {
+          position: relative;
+
+          width: 100%;
+          height: 52px;
+          min-height: 52px;
+
+          margin: 0;
+          padding: 0;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          flex-wrap: nowrap;
+
+          z-index: 100;
+        }
+
+        .daily-pill {
+          height: 12.2mm !important;
+
+          padding: 0 4.8mm 0 5.8mm !important;
+
+          border-radius: 6.2mm 0 0 6.2mm !important;
+
+          font-size: 7.4mm !important;
+        }
+
+        .department-text {
+          padding: 0 0 0 2.2mm !important;
+
+          font-size: 6.8mm !important;
+        }
+
+        /* --------------------------------------------------------
+               DAY / DATE
+            -------------------------------------------------------- */
+
+        .meta-row {
+          width: auto !important;
+
+          height: 11.8mm !important;
+
+          margin: 0.8mm 1.5mm 1.2mm !important;
+
+          display: flex !important;
+
+          align-items: center !important;
+
+          justify-content: space-between !important;
+
+          gap: 0 !important;
+        }
+
+        .meta-group {
+          width: 75mm !important;
+
+          min-width: 75mm !important;
+
+          max-width: 75mm !important;
+
+          height: 10.2mm !important;
+
+          flex: 0 0 75mm !important;
+
+          border: 0.3mm solid #b8d0e2 !important;
+
+          border-radius: 2.2mm !important;
+        }
+
+        .calendar {
+          width: 10.2mm !important;
+
+          min-width: 10.2mm !important;
+
+          max-width: 10.2mm !important;
+
+          height: 10.2mm !important;
+
+          flex: 0 0 10.2mm !important;
+
+          border-radius: 2mm 0 0 2mm !important;
+        }
+
+        .calendar svg {
+          width: 5.2mm !important;
+
+          height: 5.2mm !important;
+        }
+
+        .meta-label {
+          padding: 0 2mm !important;
+
+          font-size: 4.2mm !important;
+        }
+
+        .meta-value {
+          height: 7.2mm !important;
+
+          margin-right: 0.8mm !important;
+
+          padding: 0 3.2mm !important;
+
+          border-radius: 3.6mm !important;
+
+          font-size: 4.1mm !important;
+        }
+
+        /* --------------------------------------------------------
+               TABLE
+            -------------------------------------------------------- */
+
+        .report-table {
+          margin: 0 2.5mm 2mm !important;
+
+          border-width: 0.35mm !important;
+
+          border-radius: 2.5mm !important;
+
+          overflow: visible !important;
+        }
+
+        /* --------------------------------------------------------
+               TABLE HEADER
+            -------------------------------------------------------- */
+
+        .table-header {
+          height: 11mm !important;
+
+          min-height: 11mm !important;
+
+          grid-template-columns:
+            15.5mm
+            minmax(0, 1fr)
+            61mm !important;
+        }
+
+        .table-sl {
+          font-size: 6.5mm !important;
+        }
+
+        .table-title {
+          height: 11mm !important;
+
+          min-height: 11mm !important;
+
+          font-size: 6.7mm !important;
+        }
+
+        .table-remarks {
+          font-size: 5.8mm !important;
+
+          border-left-width: 0.3mm !important;
+        }
+
+        /* --------------------------------------------------------
+               SECTION HEADER
+            -------------------------------------------------------- */
+
+        .section-header {
+          height: 6mm !important;
+
+          min-height: 6mm !important;
+
+          padding: 0 3.3mm !important;
+
+          font-size: 3.5mm !important;
+        }
+
+        /* --------------------------------------------------------
+               TASK ROW
+            -------------------------------------------------------- */
+
+        .task-row {
+          min-height: 13.1mm !important;
+
+          grid-template-columns:
+            15.5mm
+            18.8mm
+            minmax(0, 1fr)
+            61mm !important;
+
+          break-inside: avoid !important;
+
+          page-break-inside: avoid !important;
+        }
+
+        /* --------------------------------------------------------
+               NUMBER
+            -------------------------------------------------------- */
+
+        .number-box {
+          width: 11.5mm !important;
+
+          height: 11.5mm !important;
+
+          border-radius: 1.8mm !important;
+
+          font-size: 6.2mm !important;
+        }
+
+        .number-box::after {
+          inset: 1.8mm !important;
+        }
+
+        /* --------------------------------------------------------
+               ICON
+            -------------------------------------------------------- */
+
+        .task-icon {
+          width: 12.5mm !important;
+
+          height: 12.5mm !important;
+
+          min-width: 12.5mm !important;
+
+          min-height: 12.5mm !important;
+
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18) !important;
+        }
+
+        .task-icon svg {
+          width: 7.5mm !important;
+
+          height: 7.5mm !important;
+
+          display: block !important;
+
+          fill: currentColor !important;
+
+          color: white !important;
+        }
+
+        /* --------------------------------------------------------
+               TEXT
+            -------------------------------------------------------- */
+
+        .task-text {
+          padding: 1.2mm 3mm !important;
+
+          font-size: 4.15mm !important;
+
+          line-height: 1.08 !important;
+        }
+
+        /* --------------------------------------------------------
+               REMARK
+            -------------------------------------------------------- */
+
+        .remark-cell {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+
+          padding: 1.2mm 2mm !important;
+
+          text-align: center !important;
+
+          font-family:
+            "Roboto Slab", Georgia, "Times New Roman", serif !important;
+
+          font-size: 4.1mm !important;
+
+          font-weight: 600 !important;
+
+          line-height: 1.15 !important;
+        }
+
+        /* --------------------------------------------------------
+               MODAL
+            -------------------------------------------------------- */
+
+        .icon-modal {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ============================================================
+         APPLICATION BAR
+    ============================================================ -->
+
+    <header class="app-bar">
+      <div class="app-title">Daily Report</div>
+
+      <div class="app-description">© 2026 Abhijeet Raj • ARM</div>
+    </header>
+
+    <!-- ============================================================
+         WORKSPACE
+    ============================================================ -->
+
+    <main class="workspace">
+      <!-- ========================================================
+             EDITOR
+        ======================================================== -->
+
+      <section class="panel editor-panel">
+        <div class="panel-heading">1. Paste &amp; Configure</div>
+
+        <div class="panel-content">
+          <!-- SCHOOL / DEPARTMENT -->
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label> School Name </label>
+
+              <input
+                id="school"
+                value="OPEN MINDS - A BIRLA SCHOOL, KANKARBAGH"
+              />
+            </div>
+
+            <div class="form-field">
+              <label> Department </label>
+
+              <input id="department" value="Deptt. of Examination" />
+            </div>
+          </div>
+
+          <!-- DAY / DATE -->
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label> Day </label>
+
+              <input id="day" value="" readonly aria-readonly="true" />
+            </div>
+
+            <div class="form-field">
+              <label> Date </label>
+
+              <input
+                id="date"
+                type="date"
+                value=""
+                aria-label="Select report date"
+              />
+            </div>
+          </div>
+
+          <!-- TITLE -->
+
+          <div class="form-grid">
+            <div class="form-field" style="grid-column: 1 / -1">
+              <label> Main Heading </label>
+
+              <input id="title" value="DESCRIPTION" />
+            </div>
+          </div>
+
+          <!-- SOURCE -->
+
+          <div class="form-field">
+            <label> Daily Report Text </label>
+
+            <textarea id="source" readonly></textarea>
+          </div>
+
+          <!-- BUTTONS -->
+
+          <div class="actions">
+            <button type="button" class="btn btn-primary" id="generate">
+              Generate Report
+            </button>
+
+            <button type="button" class="btn btn-gold" id="savePng">
+              Save Report as PNG (4K)
+            </button>
+
+            <button type="button" class="btn btn-secondary" id="editSource">
+              Edit Daily Report Text
+            </button>
+          </div>
+
+          <div class="help-box">
+            Select a previous date to load its saved report. The Daily Report
+            Text is read-only until you click "Edit Daily Report Text". After
+            editing, click "Generate Report" to rebuild the preview. Selected
+            icons are saved automatically. Saving the PNG also saves the same
+            current report data to JSON.
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+             PREVIEW
+        ======================================================== -->
+
+      <section class="panel preview-panel">
+        <div class="panel-heading">2. Live Report Preview</div>
+
+        <div class="preview">
+          <article class="report">
+            <!-- =================================================
+                         HEADER
+                    ================================================= -->
+
+            <header class="report-header">
+              <!-- =============================================
+                             TOP
+                        ============================================== -->
+
+              <div class="header-top">
+                <!-- TOP LEFT LOGO -->
+
+                <div class="logo-wrapper">
+                  <img
+                    class="school-logo-image"
+                    src="/static/images/school-logo.jpg"
+                    onerror="
+                      this.onerror = null;
+                      this.src = '/static/images/school-logo.png';
+                    "
+                    alt="Open Minds School Logo"
+                  />
+                </div>
+
+                <!-- SCHOOL NAME -->
+
+                <div class="school-heading" id="previewSchool">
+                  OPEN MINDS - A BIRLA SCHOOL, KANKARBAGH
+                </div>
+
+                <!-- TOP RIGHT ART -->
+
+                <div class="header-art">
+                  <img
+                    class="header-art-image"
+                    src="/static/images/header-art.png"
+                    alt="Clipboard books and pen"
+                  />
+                </div>
+              </div>
+
+              <!-- =============================================
+                             DECORATIVE LINE
+                        ============================================== -->
+
+              <div class="header-divider">
+                <span class="divider-left"> •• </span>
+
+                <span class="divider-center">
+                  <i class="divider-dot"></i>
+
+                  <i class="diamond"></i>
+
+                  <i class="diamond diamond-orange"></i>
+
+                  <i class="diamond"></i>
+
+                  <i class="divider-dot"></i>
+                </span>
+
+                <span class="divider-right"> •• </span>
+              </div>
+
+              <!-- =============================================
+                             DAILY REPORT
+                        ============================================== -->
+
+              <div class="daily-report-line">
+                <div class="daily-pill">DAILY REPORT :</div>
+
+                <div class="department-text" id="previewDepartment">
+                  Deptt. of Examination
+                </div>
+              </div>
+
+              <!-- =============================================
+                             DAY / DATE
+                        ============================================== -->
+
+              <div class="meta-row">
+                <!-- DAY -->
+
+                <div class="meta-group meta-day">
+                  <div class="calendar" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2Zm12 8H5v10h14V10ZM5 6v2h14V6H5Z"
+                      />
+                    </svg>
+                  </div>
+
+                  <div class="meta-label">DAY:</div>
+
+                  <div class="meta-value" id="previewDay"></div>
+                </div>
+                <div class="watermarkId">5793</div>
+                <!-- DATE -->
+
+                <div class="meta-group meta-date">
+                  <div class="calendar" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2Zm12 8H5v10h14V10Zm-8 3H7v2h4v-2Zm6 0h-4v2h4v-2Z"
+                      />
+                    </svg>
+                  </div>
+
+                  <div class="meta-label">DATE:</div>
+
+                  <div class="meta-value" id="previewDate"></div>
+                </div>
+              </div>
+            </header>
+
+            <!-- =================================================
+                         TABLE
+                    ================================================== -->
+
+            <section class="report-table">
+              <!-- TABLE HEADER -->
+
+              <div class="table-header">
+                <div class="table-sl">SL.No</div>
+
+                <div class="table-title" id="previewTitle">
+                  <span class="task-decoration left">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+
+                  <span class="table-title-text"> DESCRIPTION </span>
+
+                  <span class="task-decoration right">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                </div>
+
+                <div class="table-remarks">REMARKS</div>
+              </div>
+
+              <!-- GENERATED ROWS -->
+
+              <div id="rows"></div>
+            </section>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============================================================
+         ICON MODAL
+    ============================================================ -->
+
+    <div class="icon-modal" id="iconModal">
+      <div class="icon-dialog">
+        <div class="icon-toolbar">
+          <input
+            id="iconSearch"
+            class="icon-search"
+            placeholder="Search printer, certificate, student, bus, attendance, exam..."
+          />
+
+          <button type="button" class="btn btn-secondary" id="closeModal">
+            Close
+          </button>
+        </div>
+
+        <div class="icon-grid" id="iconGrid"></div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         JAVASCRIPT
+    ============================================================ -->
+
+    <script>
+      /* ============================================================
+           STATE
+        ============================================================ */
+
+      const state = {
+        sections: [],
+
+        iconOverrides: {},
+
+        iconCache: {},
+
+        activeKey: null,
+      };
+
+      /* Prevent older asynchronous date loads/renders from overwriting the
+         report after the user has already selected another date. */
+      let dateLoadVersion = 0;
+      let renderVersion = 0;
+
+      /* ============================================================
+           ICON COLOURS
+        ============================================================ */
+
+      const iconColors = [
+        "#20a39e",
+        "#ed9812",
+        "#2871b6",
+        "#852ca7",
+        "#32a13c",
+        "#e25221",
+        "#307abd",
+        "#d02b72",
+        "#329d43",
+        "#4536a3",
+        "#1da1aa",
+        "#df4e28",
+        "#c59112",
+        "#3068ad",
+      ];
+
+      /* ============================================================
+           HELPER
+        ============================================================ */
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      /* ============================================================
+           ESCAPE HTML
+        ============================================================ */
+
+      function escapeHtml(value) {
+        return String(value).replace(
+          /[&<>"']/g,
+          (character) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[character],
+        );
+      }
+
+      /* ============================================================
+           UPDATE HEADER
+        ============================================================ */
+
+      function updateHeader() {
+        $("previewSchool").textContent =
+          $("school").value.trim() || "OPEN MINDS - A BIRLA SCHOOL, KANKARBAGH";
+
+        $("previewDepartment").textContent =
+          $("department").value.trim() || "Deptt. of Examination";
+
+        $("previewDay").textContent = $("day").value.trim() || getTodayDay();
+
+        $("previewDate").textContent = getReportDate();
+
+        const title = $("title").value.trim() || "DESCRIPTION";
+
+        $("previewTitle").querySelector(".table-title-text").textContent =
+          title;
+      }
+
+      /* ============================================================
+           GENERATE REPORT
+        ============================================================ */
+
+      async function generateReport() {
+        updateHeader();
+
+        try {
+          const response = await fetch("/api/parse", {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+              text: $("source").value,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Parser error");
+          }
+
+          const data = await response.json();
+
+          state.sections = data.sections || [];
+
+          await renderRows();
+        } catch (error) {
+          console.error(error);
+
+          alert("Unable to generate the report.");
+        }
+      }
+
+      /* ============================================================
+           FLATTEN ITEMS
+        ============================================================ */
+
+      function flattenItems() {
+        const result = [];
+
+        state.sections.forEach((section, sectionIndex) => {
+          section.items.forEach((item, itemIndex) => {
+            /* ----------------------------------------------------
+           DESCRIPTION + REMARKS
+
+           Input format:
+           Description | Remark
+        ---------------------------------------------------- */
+
+            const parts = String(item.text || "").split("|");
+
+            const description = parts[0].trim();
+
+            const remark = parts.slice(1).join("|").trim();
+
+            result.push({
+              ...item,
+
+              /* IMPORTANT */
+              text: description,
+
+              /* IMPORTANT */
+              remark: remark,
+
+              sectionTitle: section.title,
+
+              sectionIndex: sectionIndex,
+
+              itemIndex: itemIndex,
+
+              key: `${sectionIndex}:${itemIndex}`,
+            });
+          });
+        });
+
+        return result;
+      }
+      /* ============================================================
+           GET SVG ICON
+        ============================================================ */
+
+      async function getIconSvg(iconName) {
+        if (state.iconCache[iconName]) {
+          return state.iconCache[iconName];
+        }
+
+        try {
+          const response = await fetch("/api/icons/svg", {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+              name: iconName,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.svg) {
+            state.iconCache[iconName] = data.svg;
+
+            return data.svg;
+          }
+        } catch (error) {
+          console.error("Icon SVG error:", error);
+        }
+
+        return "";
+      }
+
+      /* ============================================================
+           RENDER ROWS
+        ============================================================ */
+
+      async function renderRows() {
+        const container = $("rows");
+        const myRenderVersion = ++renderVersion;
+
+        /* A newer render may already have started. */
+        if (myRenderVersion !== renderVersion) return;
+
+        container.innerHTML = "";
+
+        const items = flattenItems();
+
+        let previousSection = null;
+
+        for (let index = 0; index < items.length; index++) {
+          const item = items[index];
+
+          /* ----------------------------------------------------
+                   SECTION HEADER
+                ---------------------------------------------------- */
+
+          if (item.sectionTitle !== previousSection) {
+            const section = document.createElement("div");
+
+            section.className = "section-header";
+
+            section.textContent = item.sectionTitle;
+
+            container.appendChild(section);
+          }
+
+          previousSection = item.sectionTitle;
+
+          /* ----------------------------------------------------
+                   ICON
+                ---------------------------------------------------- */
+
+          const semanticIcon =
+            (item.icons && item.icons[0]) || "mdi:clipboard-text";
+
+          const iconName = state.iconOverrides[item.key] || semanticIcon;
+
+          /* ----------------------------------------------------
+                   ROW
+                ---------------------------------------------------- */
+
+          const row = document.createElement("div");
+
+          row.className = "task-row";
+
+          row.innerHTML = `
+
+                    <div class="number-cell">
+
+                        <div class="number-box">
+                            ${item.itemIndex + 1}
+                        </div>
+
+                    </div>
+
+
+                    <div class="icon-cell">
+
+                        <button
+                            type="button"
+                            class="task-icon"
+                            data-key="${escapeHtml(item.key)}"
+                            style="
+                                background:
+                                ${iconColors[index % iconColors.length]}
+                            "
+                            title="Change icon"
+                        >
+
+                            <span
+                                class="icon-placeholder"
+                            ></span>
+
+                        </button>
+
+                    </div>
+
+
+                    <div class="task-text">
+
+                        <span>
+                            ${escapeHtml(item.text)}
+                        </span>
+
+                    </div>
+
+
+                    <div class="remark-cell" aria-label="Remarks">
+                        ${escapeHtml(item.remark || "")}
+                    </div>
+
+                `;
+
+          container.appendChild(row);
+
+          /* ----------------------------------------------------
+                   INLINE SVG
+                ---------------------------------------------------- */
+
+          const svg = await getIconSvg(iconName);
+
+          /* Do not let an older render write into the current report. */
+          if (myRenderVersion !== renderVersion) return;
+
+          const placeholder = row.querySelector(".icon-placeholder");
+
+          if (svg) {
+            placeholder.outerHTML = svg;
+          } else {
+            placeholder.innerHTML = "✓";
+
+            placeholder.style.fontSize = "28px";
+
+            placeholder.style.color = "white";
+
+            placeholder.style.fontWeight = "900";
+          }
+
+          /* ----------------------------------------------------
+                   ICON BUTTON
+                ---------------------------------------------------- */
+
+          row.querySelector(".task-icon").addEventListener("click", () => {
+            openIconPicker(item.key);
+          });
+        }
+      }
+
+      /* ============================================================
+           ICON PICKER
+        ============================================================ */
+
+      function openIconPicker(key) {
+        state.activeKey = key;
+
+        $("iconModal").classList.add("open");
+
+        $("iconSearch").value = "";
+
+        $("iconSearch").focus();
+
+        searchIcons("clipboard");
+      }
+
+      /* ============================================================
+           CLOSE ICON PICKER
+        ============================================================ */
+
+      function closeIconPicker() {
+        $("iconModal").classList.remove("open");
+
+        state.activeKey = null;
+      }
+
+      /* ============================================================
+           SEARCH ICONS
+        ============================================================ */
+
+      async function searchIcons(query) {
+        const grid = $("iconGrid");
+
+        grid.innerHTML = `
+
+                <div
+                    style="
+                        grid-column:1/-1;
+                        padding:25px;
+                        text-align:center;
+                        color:#60768b;
+                    "
+                >
+                    Searching icons...
+                </div>
+
+            `;
+
+        try {
+          const response = await fetch("/api/icons/search", {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+              q: query || "clipboard",
+
+              limit: 90,
+            }),
+          });
+
+          const data = await response.json();
+
+          grid.innerHTML = "";
+
+          const icons = data.icons || [];
+
+          if (!icons.length) {
+            grid.innerHTML = `
+
+                        <div
+                            style="
+                                grid-column:1/-1;
+                                padding:25px;
+                                text-align:center;
+                            "
+                        >
+                            No icons found.
+                        </div>
+
+                    `;
+
+            return;
+          }
+
+          for (const icon of icons) {
+            const button = document.createElement("button");
+
+            button.type = "button";
+
+            button.className = "icon-option";
+
+            button.innerHTML = `
+
+                        <span
+                            class="picker-icon"
+                        ></span>
+
+                        <small>
+                            ${escapeHtml(icon.name)}
+                        </small>
+
+                    `;
+
+            const svg = await getIconSvg(icon.name);
+
+            const holder = button.querySelector(".picker-icon");
+
+            if (svg) {
+              holder.outerHTML = svg;
+            }
+
+            button.addEventListener("click", async () => {
+              const selectedKey = state.activeKey;
+
+              if (!selectedKey) {
+                return;
+              }
+
+              /* Keep the selected icon in the current report state. */
+              state.iconOverrides[selectedKey] = icon.name;
+
+              closeIconPicker();
+
+              /* Save this selection under the CURRENT DATE immediately. */
+              saveIconsForCurrentDate();
+
+              /* Update the preview immediately. */
+              await renderRows();
+
+              /*
+               * IMPORTANT:
+               * Save the icon selection immediately.
+               * This makes the selected icon survive a browser refresh
+               * without requiring the user to press Save JSON or PNG.
+               */
+              await saveReportJson(false);
+            });
+
+            grid.appendChild(button);
+          }
+        } catch (error) {
+          console.error(error);
+
+          grid.innerHTML = `
+
+                    <div
+                        style="
+                            grid-column:1/-1;
+                            padding:25px;
+                            text-align:center;
+                            color:#9d4a4a;
+                        "
+                    >
+                        Icon search failed.
+                    </div>
+
+                `;
+        }
+      }
+
+      /* ============================================================
+           PNG HELPERS
+        ============================================================ */
+
+      function canvasBlob(canvas) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Browser could not create PNG."));
+            }
+          }, "image/png");
+        });
+      }
+
+      /* ============================================================
+           DOWNLOAD PNG
+        ============================================================ */
+
+      async function downloadCanvasPng(canvas, filename) {
+        const blob = await canvasBlob(canvas);
+
+        const url = URL.createObjectURL(blob);
+
+        try {
+          const link = document.createElement("a");
+
+          link.href = url;
+
+          link.download = filename;
+
+          link.rel = "noopener";
+
+          link.style.position = "fixed";
+
+          link.style.left = "-10000px";
+
+          document.body.appendChild(link);
+
+          link.click();
+
+          await new Promise((resolve) => setTimeout(resolve, 250));
+
+          link.remove();
+        } finally {
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+      }
+
+      /* ============================================================
+           WAIT FOR REPORT ASSETS
+        ============================================================ */
+
+      async function waitForReportAssets(report) {
+        if (document.fonts && document.fonts.ready) {
+          try {
+            await document.fonts.ready;
+          } catch (_) {}
+        }
+
+        const images = Array.from(report.querySelectorAll("img"));
+
+        await Promise.all(
+          images.map((img) => {
+            if (img.complete && img.naturalWidth > 0) {
+              return Promise.resolve();
+            }
+
+            return new Promise((resolve) => {
+              const done = () => {
+                img.removeEventListener("load", done);
+
+                img.removeEventListener("error", done);
+
+                resolve();
+              };
+
+              img.addEventListener("load", done);
+
+              img.addEventListener("error", done);
+
+              setTimeout(done, 8000);
+            });
+          }),
+        );
+
+        await new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        );
+      }
+
+      /* ============================================================
+           IMAGE → DATA URL
+        ============================================================ */
+
+      async function imageToDataUrl(src) {
+        const response = await fetch(src, {
+          credentials: "same-origin",
+
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Image request failed: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onload = () => resolve(reader.result);
+
+          reader.onerror = reject;
+
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      /* ============================================================
+           COLLECT CSS
+        ============================================================ */
+
+      function collectCssText() {
+        let css = "";
+
+        for (const sheet of Array.from(document.styleSheets)) {
+          try {
+            for (const rule of Array.from(sheet.cssRules || [])) {
+              const text = rule.cssText || "";
+
+              if (!/^@import\b/i.test(text)) {
+                css += text + "\n";
+              }
+            }
+          } catch (_) {
+            /*
+             * Google Fonts can be cross-origin.
+             * The report has fallback fonts,
+             * so it is safe to ignore inaccessible
+             * external stylesheet rules.
+             */
+          }
+        }
+
+        return css;
+      }
+
+      /* ============================================================
+           NATIVE SVG → PNG FALLBACK
+        ============================================================ */
+
+      async function nativePngFallback(report, filename) {
+        const rect = report.getBoundingClientRect();
+
+        /*
+         * IMPORTANT:
+         * Use the report's actual fixed width.
+         */
+
+        const width = 1250;
+
+        const height = Math.max(
+          1,
+          Math.round(report.scrollHeight || rect.height),
+        );
+
+        /*
+         * 4K export.
+         *
+         * Reference width = 1250.
+         * 4096 / 1250 ≈ 3.28
+         */
+
+        const targetWidth = 4096;
+
+        const scale = Math.min(4, Math.max(2, targetWidth / width));
+
+        const clone = report.cloneNode(true);
+
+        clone.style.width = `${width}px`;
+
+        clone.style.height = `${height}px`;
+
+        clone.style.margin = "0";
+
+        clone.style.boxShadow = "none";
+
+        clone.style.overflow = "visible";
+
+        clone.querySelectorAll("button").forEach((btn) => {
+          btn.style.cursor = "default";
+
+          btn.removeAttribute("title");
+        });
+
+        /* --------------------------------------------------------
+               CONVERT IMAGES TO DATA URL
+            -------------------------------------------------------- */
+
+        const originalImages = Array.from(report.querySelectorAll("img"));
+
+        const clonedImages = Array.from(clone.querySelectorAll("img"));
+
+        await Promise.all(
+          clonedImages.map(async (img, index) => {
+            const original = originalImages[index];
+
+            if (!original) {
+              return;
+            }
+
+            try {
+              img.src = await imageToDataUrl(
+                original.currentSrc || original.src,
+              );
+            } catch (_) {
+              img.src = original.currentSrc || original.src;
+            }
+
+            img.removeAttribute("srcset");
+
+            img.style.visibility = "visible";
+
+            img.style.opacity = "1";
+          }),
+        );
+
+        /* --------------------------------------------------------
+               CSS
+            -------------------------------------------------------- */
+
+        const css =
+          collectCssText() +
+          `
+
+                html,
+                body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+
+                .report {
+                    margin: 0 !important;
+                    box-shadow: none !important;
+                    overflow: visible !important;
+                }
+
+                .logo-wrapper,
+                .header-art {
+                    display: flex !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                }
+
+                .school-logo-image,
+                .header-art-image {
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                }
+
+                `;
+
+        /* --------------------------------------------------------
+               SVG
+            -------------------------------------------------------- */
+
+        const SVG_NS = "http://www.w3.org/2000/svg";
+
+        const XHTML_NS = "http://www.w3.org/1999/xhtml";
+
+        const svg = document.createElementNS(SVG_NS, "svg");
+
+        svg.setAttribute("xmlns", SVG_NS);
+
+        svg.setAttribute("width", String(Math.round(width * scale)));
+
+        svg.setAttribute("height", String(Math.round(height * scale)));
+
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+        const background = document.createElementNS(SVG_NS, "rect");
+
+        background.setAttribute("width", "100%");
+
+        background.setAttribute("height", "100%");
+
+        background.setAttribute("fill", "#fffef9");
+
+        svg.appendChild(background);
+
+        const foreign = document.createElementNS(SVG_NS, "foreignObject");
+
+        foreign.setAttribute("x", "0");
+
+        foreign.setAttribute("y", "0");
+
+        foreign.setAttribute("width", String(width));
+
+        foreign.setAttribute("height", String(height));
+
+        const holder = document.createElementNS(XHTML_NS, "div");
+
+        holder.setAttribute("xmlns", XHTML_NS);
+
+        holder.setAttribute(
+          "style",
+          `
+                    width:${width}px;
+                    height:${height}px;
+                    background:#fffef9;
+                `,
+        );
+
+        const style = document.createElementNS(XHTML_NS, "style");
+
+        style.textContent = css;
+
+        holder.appendChild(style);
+
+        const reportWrapper = document.createElementNS(XHTML_NS, "div");
+
+        reportWrapper.setAttribute("xmlns", XHTML_NS);
+
+        reportWrapper.appendChild(clone);
+
+        holder.appendChild(reportWrapper);
+
+        foreign.appendChild(holder);
+
+        svg.appendChild(foreign);
+
+        const svgText = new XMLSerializer().serializeToString(svg);
+
+        const blob = new Blob([svgText], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+
+        const url = URL.createObjectURL(blob);
+
+        try {
+          const image = new Image();
+
+          image.decoding = "async";
+
+          image.src = url;
+
+          await new Promise((resolve, reject) => {
+            image.onload = resolve;
+
+            image.onerror = () =>
+              reject(new Error("SVG renderer could not render the report."));
+          });
+
+          const canvas = document.createElement("canvas");
+
+          canvas.width = Math.round(width * scale);
+
+          canvas.height = Math.round(height * scale);
+
+          const ctx = canvas.getContext("2d", {
+            alpha: false,
+          });
+
+          if (!ctx) {
+            throw new Error("Canvas is unavailable.");
+          }
+
+          ctx.fillStyle = "#fffef9";
+
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+          await downloadCanvasPng(canvas, filename);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      /* ============================================================
+           JSON SAVE / LOAD - SAME STORAGE AS OLD VERSION
+        ============================================================ */
+
+      const JSON_SAVE_URL =
+        "https://daily-report-s9yq.onrender.com/save-report-json";
+
+      const JSON_BASE_URL =
+        "https://raw.githubusercontent.com/abhijeetraj22/daily_report_storage/main/json/";
+
+      /* HTML date input uses YYYY-MM-DD, while saved JSON filenames/data
+         continue to use DD-MM-YYYY. */
+      function toDateInputValue(dateString) {
+        const match = String(dateString || "")
+          .trim()
+          .match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (!match) return "";
+        return `${match[3]}-${match[2]}-${match[1]}`;
+      }
+
+      function fromDateInputValue(dateString) {
+        const match = String(dateString || "")
+          .trim()
+          .match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) return "";
+        return `${match[3]}-${match[2]}-${match[1]}`;
+      }
+
+      function getTodayDate() {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, "0");
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const year = now.getFullYear();
+        return `${day}-${month}-${year}`;
+      }
+
+      function getTodayDay() {
+        return getDayFromDate(getTodayDate());
+      }
+
+      /* Return the correct weekday for a DD-MM-YYYY report date.
+         This is deliberately calculated from the selected date, not from
+         the browser's current day and not from the saved JSON day value. */
+      function getDayFromDate(dateString) {
+        const match = String(dateString || "")
+          .trim()
+          .match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (!match) return "";
+
+        const day = Number(match[1]);
+        const month = Number(match[2]);
+        const year = Number(match[3]);
+        const date = new Date(year, month - 1, day);
+
+        if (
+          date.getFullYear() !== year ||
+          date.getMonth() !== month - 1 ||
+          date.getDate() !== day
+        ) {
+          return "";
+        }
+
+        return new Intl.DateTimeFormat("en-US", {
+          weekday: "long",
+        })
+          .format(date)
+          .toUpperCase();
+      }
+
+      function getReportDate() {
+        return (fromDateInputValue($("date").value) || getTodayDate()).trim();
+      }
+
+      function collectReportData() {
+        const rows = [];
+        const items = flattenItems();
+        let previousSection = null;
+
+        items.forEach((item) => {
+          if (item.sectionTitle !== previousSection) {
+            rows.push({
+              type: "section",
+              cells: ["", item.sectionTitle || "", "", ""],
+            });
+            previousSection = item.sectionTitle;
+          }
+
+          rows.push({
+            type: "data",
+            cells: [
+              String(item.itemIndex + 1),
+              String(item.text || ""),
+              "",
+              String(item.remark || ""),
+            ],
+            icon:
+              state.iconOverrides[item.key] ||
+              (item.icons && item.icons[0]) ||
+              "mdi:clipboard-text",
+          });
+        });
+
+        return {
+          date: getReportDate(),
+          day: $("day").value.trim() || "",
+          title: $("title").value.trim() || "DESCRIPTION",
+          rows,
+        };
+      }
+
+      async function saveReportJson(showAlert = true) {
+        const reportData = collectReportData();
+
+        try {
+          const response = await fetch(JSON_SAVE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(reportData),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          if (showAlert) {
+            alert(`JSON saved successfully: ${reportData.date}.json`);
+          }
+          return true;
+        } catch (error) {
+          console.error("JSON save error:", error);
+          if (showAlert) {
+            alert("JSON could not be saved.\n\n" + error.message);
+          }
+          return false;
+        }
+      }
+
+      /* ============================================================
+           DATE-SPECIFIC ICON PERSISTENCE
+           Keep icon selections separately for every report date.
+           localStorage is the immediate browser backup; JSON remains
+           the server/source-of-truth for saved reports.
+         ============================================================ */
+
+      function getIconStorageKey(date) {
+        const safeDate = String(date || getReportDate()).trim();
+        return `dailyReportIcons:${safeDate}`;
+      }
+
+      function saveIconsForCurrentDate() {
+        try {
+          localStorage.setItem(
+            getIconStorageKey(getReportDate()),
+            JSON.stringify(state.iconOverrides || {}),
+          );
+        } catch (error) {
+          console.warn("Could not save date-specific icons locally:", error);
+        }
+      }
+
+      function isGenericClipboardIcon(iconName) {
+        return String(iconName || "").trim() === "mdi:clipboard-text";
+      }
+
+      function restoreIconsForDate(
+        date,
+        targetOverrides = state.iconOverrides,
+      ) {
+        try {
+          const raw = localStorage.getItem(getIconStorageKey(date));
+          if (!raw) return;
+
+          const savedIcons = JSON.parse(raw);
+          if (!savedIcons || typeof savedIcons !== "object") return;
+
+          /*
+           * IMPORTANT:
+           * Older versions saved the generic clipboard icon for every row.
+           * That value is NOT a real user selection and must never override
+           * the sentence-based semantic icon when an older date is loaded.
+           */
+          Object.entries(savedIcons).forEach(([key, iconName]) => {
+            if (!isGenericClipboardIcon(iconName)) {
+              targetOverrides[key] = iconName;
+            }
+          });
+        } catch (error) {
+          console.warn("Could not restore date-specific icons:", error);
+        }
+      }
+
+      /* ============================================================
+           CLIENT-SIDE SEMANTIC ICON FALLBACK
+
+           Older saved JSON files may not contain an "icon" field, and
+           the deployed /api/parse service may also be an older version.
+           This keeps previous-date reports visually meaningful even
+           when the server parser cannot provide semantic icons.
+         ============================================================ */
+
+      function suggestLoadedIcon(text) {
+        const t = String(text || "")
+          .toLowerCase()
+          .trim();
+
+        if (t.includes("printed") && t.includes("question paper"))
+          return "mdi:printer";
+        if (t.includes("formatted") && t.includes("question paper"))
+          return "mdi:file-document-edit";
+        if (t.includes("q/a")) return "mdi:clipboard-text";
+        if (t.includes("re-arranged") && t.includes("bundle"))
+          return "mdi:package-variant-closed";
+        if (t.includes("distributed") && t.includes("answer-copy"))
+          return "mdi:account-multiple";
+        if (t.includes("transfer certificate") && t.includes("correction"))
+          return "mdi:certificate";
+        if (t.includes("transfer certificate")) return "mdi:certificate";
+        if (t.includes("marksheet")) return "mdi:file-chart";
+        if (t.includes("caste certificate") && t.includes("uploaded"))
+          return "mdi:cloud-upload";
+        if (t.includes("caste certificate")) return "mdi:certificate";
+        if (t.includes("migration certificate")) return "mdi:passport";
+        if (t.includes("biometric") && t.includes("attendance"))
+          return "mdi:fingerprint";
+        if (t.includes("attendance")) return "mdi:calendar-check";
+        if (t.includes("student")) return "mdi:account-school";
+        if (t.includes("teacher")) return "mdi:account-tie";
+        if (t.includes("principal")) return "mdi:account-tie";
+        if (t.includes("certificate")) return "mdi:certificate";
+        if (t.includes("uploaded")) return "mdi:cloud-upload";
+        if (t.includes("verified") || t.includes("verify"))
+          return "mdi:clipboard-check";
+        if (t.includes("bus")) return "mdi:bus";
+        if (t.includes("email")) return "mdi:email";
+        if (t.includes("message")) return "mdi:message-text";
+        if (t.includes("print")) return "mdi:printer";
+        if (t.includes("question") || t.includes("exam"))
+          return "mdi:file-document-edit";
+        if (t.includes("distributed") || t.includes("given"))
+          return "mdi:account-multiple";
+        if (t.includes("bundle") || t.includes("arranged"))
+          return "mdi:package-variant-closed";
+        if (t.includes("check") || t.includes("correction"))
+          return "mdi:clipboard-check";
+
+        return "mdi:clipboard-text";
+      }
+
+      async function loadReportJson(date, loadVersion = dateLoadVersion) {
+        const safeDate = String(date || "").trim();
+        if (!safeDate) return false;
+
+        /* Only the latest selected date may change the UI/state. */
+        if (loadVersion !== dateLoadVersion) return false;
+
+        const url = `${JSON_BASE_URL}${encodeURIComponent(safeDate)}.json?cache=${Date.now()}`;
+
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) return false;
+
+          const data = await response.json();
+
+          /* User may have selected another date while this request was pending. */
+          if (loadVersion !== dateLoadVersion) return false;
+
+          const rows = Array.isArray(data.rows) ? data.rows : [];
+          const sections = [];
+          let currentSection = null;
+
+          /*
+           * Rebuild the Daily Report Text editor from the saved JSON.
+           * This allows an older/previous date to be loaded, edited in the
+           * textarea, and regenerated without losing the saved content.
+           */
+          const sourceLines = [];
+
+          /*
+           * IMPORTANT:
+           * Every date starts with a completely clean icon-override map.
+           * The semantic icons are rebuilt from that date's sentences below,
+           * then saved/manual icons for the same date are applied on top.
+           */
+          state.iconOverrides = {};
+
+          rows.forEach((row) => {
+            const cells = Array.isArray(row.cells) ? row.cells : [];
+
+            if (row.type === "section") {
+              const sectionTitle = String(cells[1] || "").trim();
+
+              currentSection = {
+                title: sectionTitle,
+                items: [],
+              };
+              sections.push(currentSection);
+
+              if (sectionTitle) {
+                sourceLines.push(`*${sectionTitle}*`);
+              }
+              return;
+            }
+
+            if (!currentSection) {
+              currentSection = { title: "EXAMINATION WORKS", items: [] };
+              sections.push(currentSection);
+            }
+
+            const description = String(cells[1] || "").trim();
+            const remark = String(cells[3] || "").trim();
+
+            if (description) {
+              sourceLines.push(
+                `* ${description}${remark ? ` | ${remark}` : ""}`,
+              );
+            }
+
+            const itemIndex = currentSection.items.length;
+
+            currentSection.items.push({
+              text: remark ? `${description} | ${remark}` : description,
+              /*
+               * row.icon may be a real manually selected icon, but older
+               * saved JSON files contain mdi:clipboard-text for every row.
+               * The generic clipboard value must be treated as "no saved
+               * manual icon" so the sentence can choose its semantic icon.
+               */
+              icons:
+                !isGenericClipboardIcon(row.icon) && row.icon ? [row.icon] : [],
+            });
+
+            /* RESTORE ONLY A REAL SAVED SELECTED ICON FROM SERVER JSON */
+            if (row.icon && !isGenericClipboardIcon(row.icon)) {
+              const sectionIndex = sections.length - 1;
+              state.iconOverrides[`${sectionIndex}:${itemIndex}`] = row.icon;
+            }
+          });
+
+          /*
+           * Put the saved report text into the editor AFTER the previous
+           * date has been loaded.  A date with no saved JSON stays blank.
+           * This is intentionally based only on that date's JSON rows.
+           */
+          $("source").value = sourceLines.join("\n\n");
+
+          /* ============================================================
+             REBUILD SEMANTIC ICONS FOR THE LOADED DATE
+             ============================================================
+
+             Older JSON files contain only sentence text and no icon field.
+             In that case, do NOT fall back to the clipboard icon. Re-send
+             the loaded sentences through the same /api/parse logic used by
+             Generate Report so each sentence receives its appropriate
+             semantic icon (printer, certificate, student, attendance, etc.).
+          */
+          try {
+            const semanticSource = [];
+
+            rows.forEach((row) => {
+              const cells = Array.isArray(row.cells) ? row.cells : [];
+
+              if (row.type === "section") {
+                const title = String(cells[1] || "").trim();
+                if (title) semanticSource.push(`*${title}*`);
+                return;
+              }
+
+              if (row.type === "data") {
+                const description = String(cells[1] || "").trim();
+                const remark = String(cells[3] || "").trim();
+                if (description) {
+                  semanticSource.push(
+                    `* ${description}${remark ? ` | ${remark}` : ""}`,
+                  );
+                }
+              }
+            });
+
+            if (semanticSource.length) {
+              const semanticResponse = await fetch("/api/parse", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: semanticSource.join("\n\n") }),
+              });
+
+              if (semanticResponse.ok) {
+                const semanticData = await semanticResponse.json();
+
+                if (loadVersion !== dateLoadVersion) return false;
+
+                const semanticSections = Array.isArray(semanticData.sections)
+                  ? semanticData.sections
+                  : [];
+
+                sections.forEach((section, sectionIndex) => {
+                  const semanticSection = semanticSections[sectionIndex];
+                  const semanticItems = semanticSection?.items || [];
+
+                  section.items.forEach((item, itemIndex) => {
+                    /*
+                     * Keep a real manually saved server icon above semantic
+                     * logic. A generic clipboard icon is deliberately ignored
+                     * because older JSON files used it as the default for all
+                     * rows.
+                     */
+                    const savedIcon =
+                      state.iconOverrides[`${sectionIndex}:${itemIndex}`];
+
+                    if (savedIcon && !isGenericClipboardIcon(savedIcon)) {
+                      item.icons = [savedIcon];
+                      return;
+                    }
+
+                    const semanticIcon = semanticItems[itemIndex]?.icons?.[0];
+                    const fallbackIcon = suggestLoadedIcon(item.text || "");
+
+                    /*
+                     * If the deployed parser returns the generic clipboard
+                     * icon, use the local semantic rules for this loaded
+                     * previous-date report instead.
+                     */
+                    const usableServerIcon =
+                      semanticIcon && semanticIcon !== "mdi:clipboard-text"
+                        ? semanticIcon
+                        : "";
+
+                    item.icons = [usableServerIcon || fallbackIcon];
+                  });
+                });
+              } else {
+                sections.forEach((section) => {
+                  section.items.forEach((item) => {
+                    if (
+                      !item.icons.length ||
+                      item.icons[0] === "mdi:clipboard-text"
+                    ) {
+                      item.icons = [suggestLoadedIcon(item.text)];
+                    }
+                  });
+                });
+              }
+            }
+          } catch (semanticError) {
+            console.warn(
+              "Could not rebuild semantic icons for loaded date:",
+              semanticError,
+            );
+
+            sections.forEach((section) => {
+              section.items.forEach((item) => {
+                if (!item.icons.length) item.icons = ["mdi:clipboard-text"];
+              });
+            });
+          }
+
+          /*
+           * Restore browser-local selections for THIS DATE only.
+           * These selections have priority over semantic icons and also
+           * protect old JSON files that pre-date row.icon storage.
+           */
+          restoreIconsForDate(safeDate, state.iconOverrides);
+
+          /* Keep the date-specific icon overrides restored above. */
+          state.sections = sections;
+
+          /* NEVER replace the user's selected date with data.date from JSON.
+             The selected date is the source of truth for this load. */
+          $("date").value = toDateInputValue(safeDate);
+
+          /* ALWAYS derive DAY from the selected report date.
+             Never restore a stale day value from JSON. */
+          const correctDay = getDayFromDate(safeDate);
+          if (correctDay) $("day").value = correctDay;
+
+          if (data.title) $("title").value = data.title;
+
+          updateHeader();
+          await renderRows();
+          return true;
+        } catch (error) {
+          console.log("No saved JSON for", safeDate);
+          return false;
+        }
+      }
+
+      /* ============================================================
+           SAVE REPORT AS PNG
+        ============================================================ */
+
+      async function saveReportAsPng() {
+        const button = $("savePng");
+
+        if (!button) {
+          return;
+        }
+
+        updateHeader();
+
+        const report = document.querySelector(".report");
+
+        if (!report) {
+          alert("Report preview is not available.");
+
+          return;
+        }
+
+        const safeDate = (getReportDate() || getTodayDate()).replace(
+          /[^0-9A-Za-z_-]+/g,
+          "-",
+        );
+
+        const filename = `Daily_Report_${safeDate}.png`;
+
+        const originalText = button.textContent;
+
+        button.disabled = true;
+
+        button.textContent = "Saving PNG…";
+
+        document.body.classList.add("png-exporting");
+
+        try {
+          await waitForReportAssets(report);
+
+          let saved = false;
+
+          /* ====================================================
+                   FIRST OPTION:
+                   HTML2CANVAS
+                ==================================================== */
+
+          if (typeof window.html2canvas === "function") {
+            try {
+              const width = 1250;
+
+              const scale = Math.min(4, Math.max(2, 4096 / width));
+
+              const canvas = await window.html2canvas(report, {
+                scale,
+
+                useCORS: true,
+
+                allowTaint: false,
+
+                backgroundColor: "#fffef9",
+
+                logging: false,
+
+                imageTimeout: 15000,
+
+                width,
+
+                height: report.scrollHeight,
+
+                scrollX: 0,
+
+                scrollY: 0,
+
+                onclone: (clonedDocument) => {
+                  const clonedReport = clonedDocument.querySelector(".report");
+
+                  if (!clonedReport) {
+                    return;
+                  }
+
+                  clonedReport.style.width = "1250px";
+
+                  clonedReport.style.minWidth = "1250px";
+
+                  clonedReport.style.maxWidth = "1250px";
+
+                  clonedReport.style.margin = "0";
+
+                  clonedReport.style.boxShadow = "none";
+
+                  clonedReport.style.overflow = "visible";
+
+                  clonedDocument
+                    .querySelectorAll(".logo-wrapper, .header-art")
+                    .forEach((element) => {
+                      element.style.display = "flex";
+
+                      element.style.visibility = "visible";
+
+                      element.style.opacity = "1";
+                    });
+
+                  clonedDocument
+                    .querySelectorAll(".school-logo-image, .header-art-image")
+                    .forEach((element) => {
+                      element.style.display = "block";
+
+                      element.style.visibility = "visible";
+
+                      element.style.opacity = "1";
+                    });
+                },
+              });
+
+              if (canvas.width < 1000 || canvas.height < 500) {
+                throw new Error("html2canvas returned invalid canvas.");
+              }
+
+              await downloadCanvasPng(canvas, filename);
+
+              saved = true;
+            } catch (error) {
+              console.warn("html2canvas failed. Using native renderer.", error);
+            }
+          }
+
+          /* ====================================================
+                   FALLBACK
+                ==================================================== */
+
+          if (!saved) {
+            await nativePngFallback(report, filename);
+          }
+
+          /* ====================================================
+             SAVE THE SAME CURRENT REPORT DATA TO JSON
+
+             IMPORTANT:
+             Clicking "Save Report as PNG" must ALSO save the exact
+             current report data (including selected icons) to JSON.
+             Keep the browser icon backup synchronized first, then
+             send collectReportData() to the existing JSON endpoint.
+             ==================================================== */
+          saveIconsForCurrentDate();
+
+          const jsonSaved = await saveReportJson(false);
+
+          if (!jsonSaved) {
+            alert(
+              "PNG saved successfully, but the JSON data could not be saved to the server.",
+            );
+          }
+        } catch (error) {
+          console.error("PNG export error:", error);
+
+          alert(
+            "PNG could not be saved. " +
+              "Please open the page through the FastAPI server " +
+              "and try again.",
+          );
+        } finally {
+          document.body.classList.remove("png-exporting");
+
+          button.disabled = false;
+
+          button.textContent = originalText;
+        }
+      }
+
+      /* ============================================================
+           EVENTS
+        ============================================================ */
+
+      $("generate").addEventListener("click", generateReport);
+
+      $("savePng").addEventListener("click", saveReportAsPng);
+
+      /*
+       * EDIT DAILY REPORT TEXT
+       *
+       * The textarea starts read-only. When a previous date is selected,
+       * its saved JSON is loaded into the textarea. Clicking this button
+       * unlocks that loaded text so the user can modify it and regenerate
+       * the report.
+       */
+      $("editSource").addEventListener("click", () => {
+        const source = $("source");
+        source.removeAttribute("readonly");
+        source.focus();
+
+        const button = $("editSource");
+        button.textContent = "Editing Daily Report Text";
+        button.classList.remove("btn-secondary");
+        button.classList.add("btn-gold");
+      });
+
+      /* The DATE field is a real browser calendar.
+         Clicking it opens the date picker; the selected date is converted
+         back to DD-MM-YYYY for the existing JSON storage format. */
+      $("date").addEventListener("click", () => {
+        try {
+          if (typeof $("date").showPicker === "function") {
+            $("date").showPicker();
+          }
+        } catch (error) {
+          /* Browsers that do not allow showPicker() will still use
+             the native date picker automatically. */
+        }
+      });
+
+      /* Change date -> load saved JSON if it exists; otherwise show a blank report. */
+      $("date").addEventListener("change", async () => {
+        const selectedDate = getReportDate();
+
+        /* Every date change invalidates all older async loads/renders. */
+        const myLoadVersion = ++dateLoadVersion;
+        ++renderVersion;
+
+        /* DAY must always follow the date selected by the user. */
+        const selectedDay = getDayFromDate(selectedDate);
+        if (selectedDay) $("day").value = selectedDay;
+
+        /* Never carry data or icons from the previously displayed date. */
+        state.sections = [];
+        state.iconOverrides = {};
+        $("source").value = "";
+
+        /* A newly selected date starts read-only until Edit is clicked. */
+        $("source").setAttribute("readonly", "");
+        $("editSource").textContent = "Edit Daily Report Text";
+        $("editSource").classList.remove("btn-gold");
+        $("editSource").classList.add("btn-secondary");
+
+        const loaded = await loadReportJson(selectedDate, myLoadVersion);
+
+        /* Ignore a result belonging to an older date selection. */
+        if (myLoadVersion !== dateLoadVersion) return;
+
+        if (!loaded) {
+          state.sections = [];
+          state.iconOverrides = {};
+          $("source").value = "";
+          $("source").setAttribute("readonly", "");
+          $("editSource").textContent = "Edit Daily Report Text";
+          $("editSource").classList.remove("btn-gold");
+          $("editSource").classList.add("btn-secondary");
+          updateHeader();
+          await renderRows();
+        }
+      });
+
+      $("closeModal").addEventListener("click", closeIconPicker);
+
+      $("iconModal").addEventListener("click", (event) => {
+        if (event.target === $("iconModal")) {
+          closeIconPicker();
+        }
+      });
+
+      /* ============================================================
+           LIVE HEADER UPDATE
+        ============================================================ */
+
+      ["school", "department", "day", "date", "title"].forEach((id) => {
+        $(id).addEventListener("input", updateHeader);
+      });
+
+      /* ============================================================
+           ICON SEARCH DEBOUNCE
+        ============================================================ */
+
+      let searchTimer;
+
+      $("iconSearch").addEventListener("input", () => {
+        clearTimeout(searchTimer);
+
+        searchTimer = setTimeout(() => {
+          searchIcons($("iconSearch").value.trim());
+        }, 250);
+      });
+
+      /* ============================================================
+           ESCAPE CLOSE MODAL
+        ============================================================ */
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeIconPicker();
+        }
+      });
+
+      /* ============================================================
+           INITIAL
+        ============================================================ */
+
+      /* ============================================================
+           INITIAL STATE
+
+           Every time the page opens or refreshes:
+           1. Start on TODAY.
+           2. Automatically load TODAY'S saved JSON, if it exists.
+           3. Show TODAY'S saved Daily Report Text.
+           4. Keep the text read-only until "Edit Daily Report Text"
+              is clicked.
+           5. If TODAY has no saved JSON, start with a blank report.
+         ============================================================ */
+
+      (async () => {
+        const today = getTodayDate();
+
+        const myLoadVersion = ++dateLoadVersion;
+        ++renderVersion;
+
+        $("date").value = toDateInputValue(today);
+        $("day").value = getTodayDay();
+        $("source").value = "";
+        $("source").setAttribute("readonly", "");
+        $("editSource").textContent = "Edit Daily Report Text";
+        $("editSource").classList.remove("btn-gold");
+        $("editSource").classList.add("btn-secondary");
+
+        state.sections = [];
+        state.iconOverrides = {};
+
+        updateHeader();
+        await renderRows();
+
+        /*
+         * IMPORTANT:
+         * Load today's already-saved report automatically on page open.
+         * This was previously omitted, which caused today's saved data
+         * to disappear after refresh.
+         */
+        const loaded = await loadReportJson(today, myLoadVersion);
+
+        if (myLoadVersion !== dateLoadVersion) return;
+
+        if (!loaded) {
+          state.sections = [];
+          state.iconOverrides = {};
+          $("source").value = "";
+          updateHeader();
+          await renderRows();
+        }
+      })();
+    </script>
+  </body>
+</html>

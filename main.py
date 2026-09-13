@@ -1,0 +1,697 @@
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from pathlib import Path
+import re
+import httpx
+import urllib.parse
+import os
+import time
+import hmac
+import hashlib
+import base64# ============================================================
+# APP
+# ============================================================
+
+app = FastAPI(
+    title="Open Minds Daily Report Designer"
+)
+
+
+# ============================================================
+# SERVER-SIDE PASSWORD PROTECTION
+#
+# IMPORTANT:
+# The password is read ONLY from Render environment variables.
+# It is never stored in the HTML/JavaScript.
+#
+# Render Environment Variable:
+#   SECRET_KEY = your private login password
+#
+# The existing SECRET_KEY from your Render service is used directly as the
+# Daily Report login password. No new DAILY_REPORT_PASSWORD variable is needed.
+# ============================================================
+
+AUTH_PASSWORD = os.getenv("SECRET_KEY", "").strip()
+# Use the same Render SECRET_KEY to sign the authentication cookie.
+AUTH_SECRET = AUTH_PASSWORD
+
+AUTH_COOKIE = "daily_report_auth"
+AUTH_MAX_AGE = 12 * 60 * 60  # 12 hours
+
+
+def _auth_secret_bytes() -> bytes:
+    # Fail closed if the deployment was not configured correctly.
+    # SECRET_KEY is both the login password and cookie-signing secret.
+    secret = AUTH_SECRET or AUTH_PASSWORD
+    return secret.encode("utf-8")
+
+
+def _make_auth_token() -> str:
+    expires = int(time.time()) + AUTH_MAX_AGE
+    payload = str(expires).encode("utf-8")
+    signature = hmac.new(
+        _auth_secret_bytes(),
+        payload,
+        hashlib.sha256,
+    ).digest()
+
+    return (
+        base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+        + "."
+        + base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    )
+
+
+def _valid_auth_token(token: str | None) -> bool:
+    if not token or "." not in token or not _auth_secret_bytes():
+        return False
+
+    encoded_expiry, encoded_signature = token.split(".", 1)
+
+    try:
+        payload = base64.urlsafe_b64decode(encoded_expiry + "===")
+        supplied_signature = base64.urlsafe_b64decode(
+            encoded_signature + "==="
+        )
+        expires = int(payload.decode("utf-8"))
+    except (ValueError, TypeError, base64.binascii.Error):
+        return False
+
+    if expires < int(time.time()):
+        return False
+
+    expected_signature = hmac.new(
+        _auth_secret_bytes(),
+        payload,
+        hashlib.sha256,
+    ).digest()
+
+    return hmac.compare_digest(
+        supplied_signature,
+        expected_signature,
+    )
+
+
+def _is_authenticated(request: Request) -> bool:
+    if not AUTH_PASSWORD:
+        return False
+
+    return _valid_auth_token(
+        request.cookies.get(AUTH_COOKIE)
+    )
+
+
+LOGIN_PAGE = """
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Report — Login</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    background: linear-gradient(135deg, #edf3f8, #dfeaf3);
+    color: #173f73;
+  }
+  body {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+  }
+  .login-card {
+    width: min(430px, 100%);
+    background: white;
+    border: 1px solid #cbd9e5;
+    border-radius: 18px;
+    padding: 30px;
+    box-shadow: 0 22px 60px rgba(20, 50, 80, .18);
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+  }
+  p {
+    margin: 0 0 24px;
+    color: #60758a;
+    font-size: 14px;
+  }
+  label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  input {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid #c8d5e0;
+    border-radius: 10px;
+    font-size: 16px;
+    outline: none;
+  }
+  input:focus {
+    border-color: #557ca3;
+    box-shadow: 0 0 0 3px rgba(85,124,163,.12);
+  }
+  button {
+    width: 100%;
+    margin-top: 14px;
+    padding: 13px 14px;
+    border: 0;
+    border-radius: 10px;
+    color: white;
+    background: #173f73;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .error {
+    margin: 0 0 16px;
+    padding: 11px 12px;
+    border-radius: 9px;
+    color: #8c1d22;
+    background: #fdebed;
+    font-size: 13px;
+  }
+  .brand {
+    margin-bottom: 22px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: .5px;
+  }
+</style>
+</head>
+<body>
+  <main class="login-card">
+    <div class="brand">OPEN MINDS • DAILY REPORT</div>
+    <h1>Secure Access</h1>
+    <p>Enter the password to open the Daily Report Designer.</p>
+    {error}
+    <form method="post" action="/login">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password"
+             autocomplete="current-password" required autofocus>
+      <button type="submit">Open Daily Report</button>
+    </form>
+  </main>
+</body>
+</html>
+"""
+
+
+# Public login page.
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    if not AUTH_PASSWORD:
+        return HTMLResponse(
+            "<h1>Server authentication is not configured.</h1>"
+            "<p>Set SECRET_KEY in Render Environment Variables.</p>",
+            status_code=503,
+        )
+
+    return HTMLResponse(LOGIN_PAGE.format(error=""))
+
+
+@app.post("/login")
+async def login(request: Request):
+    if not AUTH_PASSWORD:
+        return HTMLResponse(
+            "<h1>Server authentication is not configured.</h1>"
+            "<p>Set SECRET_KEY in Render Environment Variables.</p>",
+            status_code=503,
+        )
+
+    body = await request.body()
+    form = urllib.parse.parse_qs(
+        body.decode("utf-8"),
+        keep_blank_values=True,
+    )
+    password = form.get("password", [""])[0]
+
+    if not hmac.compare_digest(password, AUTH_PASSWORD):
+        return HTMLResponse(
+            LOGIN_PAGE.format(
+                error='<div class="error">Incorrect password. Please try again.</div>'
+            ),
+            status_code=401,
+        )
+
+    response = RedirectResponse(
+        url="/",
+        status_code=303,
+    )
+
+    response.set_cookie(
+        key=AUTH_COOKIE,
+        value=_make_auth_token(),
+        max_age=AUTH_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=(request.url.scheme == "https"),
+        path="/",
+    )
+
+    return response
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    response = RedirectResponse(
+        url="/login",
+        status_code=303,
+    )
+    response.delete_cookie(
+        key=AUTH_COOKIE,
+        path="/",
+    )
+    return response
+
+
+# Protect the Daily Report page and all application API endpoints.
+# Static assets remain public so the login page and browser can load images.
+@app.middleware("http")
+async def password_gate(request: Request, call_next):
+    path = request.url.path
+
+    public_paths = {
+        "/login",
+        "/logout",
+    }
+
+    if (
+        path not in public_paths
+        and (
+            path == "/"
+            or path.startswith("/api/")
+            or path == "/save-report-json"
+        )
+    ):
+        if not _is_authenticated(request):
+            if path == "/" and request.method == "GET":
+                return RedirectResponse(
+                    url="/login",
+                    status_code=303,
+                )
+
+            return Response(
+                content="Authentication required.",
+                status_code=401,
+                media_type="text/plain",
+            )
+
+    return await call_next(request)
+
+
+# ============================================================
+# DIRECTORIES
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+
+TEMPLATES_DIR.mkdir(exist_ok=True)
+STATIC_DIR.mkdir(exist_ok=True)
+
+(STATIC_DIR / "images").mkdir(exist_ok=True)
+
+
+# ============================================================
+# STATIC FILES
+# ============================================================
+
+app.mount(
+    "/static",
+    StaticFiles(directory=str(STATIC_DIR)),
+    name="static"
+)
+
+
+# ============================================================
+# MODELS
+# ============================================================
+
+class ParseRequest(BaseModel):
+    text: str
+
+
+class IconSearchRequest(BaseModel):
+    q: str = "clipboard"
+    limit: int = 90
+
+
+class IconSvgRequest(BaseModel):
+    name: str
+
+
+# ============================================================
+# HOME
+# ============================================================
+
+@app.get("/", response_class=HTMLResponse)
+async def home():
+
+    html_file = TEMPLATES_DIR / "index.html"
+
+    if not html_file.exists():
+        return HTMLResponse(
+            """
+            <h1>index.html not found</h1>
+            <p>Please create templates/index.html</p>
+            """,
+            status_code=500
+        )
+
+    return HTMLResponse(
+        html_file.read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+# ============================================================
+# PARSER
+# ============================================================
+
+def parse_report(text: str):
+
+    lines = [
+        line.strip()
+        for line in text.splitlines()
+    ]
+
+    sections = []
+
+    current_section = None
+
+    for line in lines:
+
+        if not line:
+            continue
+
+        # ----------------------------------------------------
+        # SECTION
+        # ----------------------------------------------------
+
+        section_match = re.match(
+            r"^\*(.+?)\*$",
+            line
+        )
+
+        if section_match:
+
+            title = section_match.group(1).strip()
+
+            current_section = {
+                "title": title,
+                "items": []
+            }
+
+            sections.append(
+                current_section
+            )
+
+            continue
+
+        # ----------------------------------------------------
+        # TASK
+        # ----------------------------------------------------
+
+        if line.startswith("*"):
+
+            clean = line.lstrip("*").strip()
+
+            if not clean:
+                continue
+
+            if current_section is None:
+
+                current_section = {
+                    "title": "DESCRIPTION",
+                    "items": []
+                }
+
+                sections.append(
+                    current_section
+                )
+
+            current_section["items"].append(
+                {
+                    "text": clean,
+                    "icons": suggest_icons(clean)
+                }
+            )
+
+    return {
+        "sections": sections
+    }
+
+
+# ============================================================
+# ICON SUGGESTION
+# ============================================================
+
+def suggest_icons(text: str):
+    """Return icons ordered from most semantically relevant to least relevant."""
+    t = text.lower().strip()
+
+    # Highly specific phrases first.  The frontend uses icons[0] as the
+    # automatic choice, so ordering matters.
+    rules = [
+        (("printed" , "question paper"), ["mdi:printer", "mdi:file-document-edit"]),
+        (("formatted", "question paper"), ["mdi:file-document-edit", "mdi:format-align-left"]),
+        (("q/a",), ["mdi:clipboard-text", "mdi:help-circle"]),
+        (("re-arranged", "bundle"), ["mdi:package-variant-closed", "mdi:archive-outline"]),
+        (("distributed", "answer-copy"), ["mdi:account-multiple", "mdi:clipboard-check"]),
+        (("transfer certificate", "correction"), ["mdi:certificate", "mdi:file-certificate"]),
+        (("transfer certificate",), ["mdi:certificate", "mdi:file-certificate"]),
+        (("marksheet",), ["mdi:file-chart", "mdi:certificate"]),
+        (("caste certificate", "uploaded"), ["mdi:cloud-upload", "mdi:file-upload"]),
+        (("caste certificate",), ["mdi:certificate", "mdi:file-certificate"]),
+        (("migration certificate",), ["mdi:passport", "mdi:certificate"]),
+        (("biometric", "attendance"), ["mdi:fingerprint", "mdi:account-check"]),
+        (("attendance",), ["mdi:calendar-check", "mdi:account-check"]),
+        (("student",), ["mdi:account-school", "mdi:account-group"]),
+        (("teacher",), ["mdi:account-tie", "mdi:account-school"]),
+        (("principal",), ["mdi:account-tie", "mdi:account-school"]),
+        (("certificate",), ["mdi:certificate", "mdi:file-certificate"]),
+        (("uploaded",), ["mdi:cloud-upload", "mdi:file-upload"]),
+        (("verified",), ["mdi:clipboard-check", "mdi:check-decagram"]),
+        (("verify",), ["mdi:clipboard-check", "mdi:check-decagram"]),
+        (("bus",), ["mdi:bus", "mdi:bus-school"]),
+        (("email",), ["mdi:email", "mdi:email-outline"]),
+        (("message",), ["mdi:message-text", "mdi:message"]),
+    ]
+
+    for needles, icons in rules:
+        if all(n in t for n in needles):
+            return icons
+
+    if "print" in t:
+        return ["mdi:printer", "mdi:file-document"]
+    if "question" in t or "exam" in t:
+        return ["mdi:file-document-edit", "mdi:clipboard-text"]
+    if "distributed" in t or "given" in t:
+        return ["mdi:account-multiple", "mdi:clipboard-check"]
+    if "bundle" in t or "arranged" in t:
+        return ["mdi:package-variant-closed", "mdi:archive-outline"]
+    if "check" in t or "correction" in t:
+        return ["mdi:clipboard-check", "mdi:file-check"]
+
+    return ["mdi:clipboard-text", "mdi:file-document", "mdi:clipboard-check"]
+
+
+# ============================================================
+# PARSE ENDPOINT
+# ============================================================
+
+@app.post("/api/parse")
+async def parse_endpoint(
+    request: ParseRequest
+):
+
+    return parse_report(
+        request.text
+    )
+
+
+# ============================================================
+# ICON SEARCH
+# ============================================================
+
+@app.post("/api/icons/search")
+async def icon_search(
+    request: IconSearchRequest
+):
+
+    query = request.q.strip()
+
+    if not query:
+        query = "clipboard"
+
+    limit = max(
+        10,
+        min(request.limit, 120)
+    )
+
+    encoded = urllib.parse.quote(
+        query
+    )
+
+    url = (
+        "https://api.iconify.design/"
+        f"collection?prefix=mdi&"
+        f"query={encoded}"
+    )
+
+    # --------------------------------------------------------
+    # Use Iconify search API
+    # --------------------------------------------------------
+
+    search_url = (
+        "https://api.iconify.design/search"
+        f"?query={encoded}"
+        f"&limit={limit}"
+    )
+
+    try:
+
+        async with httpx.AsyncClient(
+            timeout=10
+        ) as client:
+
+            response = await client.get(
+                search_url
+            )
+
+            response.raise_for_status()
+
+            data = response.json()
+
+            icons = []
+
+            for name in data.get(
+                "icons",
+                []
+            ):
+
+                if ":" not in name:
+                    name = f"mdi:{name}"
+
+                icons.append(
+                    {
+                        "name": name
+                    }
+                )
+
+            return {
+                "icons": icons[:limit]
+            }
+
+    except Exception:
+
+        # ----------------------------------------------------
+        # Fallback icons
+        # ----------------------------------------------------
+
+        fallback = [
+            "mdi:printer",
+            "mdi:clipboard-text",
+            "mdi:clipboard-check",
+            "mdi:file-document",
+            "mdi:file-certificate",
+            "mdi:certificate",
+            "mdi:account-group",
+            "mdi:account-school",
+            "mdi:school",
+            "mdi:package-variant",
+            "mdi:archive",
+            "mdi:cloud-upload",
+            "mdi:fingerprint",
+            "mdi:calendar-check",
+            "mdi:bus",
+            "mdi:email",
+            "mdi:message",
+            "mdi:eye",
+            "mdi:monitor",
+            "mdi:help-circle"
+        ]
+
+        return {
+            "icons": [
+                {
+                    "name": x
+                }
+                for x in fallback
+            ]
+        }
+
+
+# ============================================================
+# ICON SVG
+#
+# IMPORTANT:
+# Instead of leaving <iconify-icon> in the report,
+# this endpoint returns the actual SVG.
+#
+# Therefore PDF printing does NOT depend on Iconify
+# web-component rendering.
+# ============================================================
+
+@app.post("/api/icons/svg")
+async def icon_svg(
+    request: IconSvgRequest
+):
+
+    name = request.name.strip()
+
+    if ":" not in name:
+        name = f"mdi:{name}"
+
+    encoded = urllib.parse.quote(
+        name,
+        safe=""
+    )
+
+    url = (
+        f"https://api.iconify.design/"
+        f"{encoded}.svg"
+        "?height=1em"
+        "&width=1em"
+    )
+
+    try:
+
+        async with httpx.AsyncClient(
+            timeout=10
+        ) as client:
+
+            response = await client.get(
+                url
+            )
+
+            response.raise_for_status()
+
+            svg = response.text
+
+            return {
+                "name": name,
+                "svg": svg
+            }
+
+    except Exception:
+
+        return {
+            "name": name,
+            "svg": ""
+        }
