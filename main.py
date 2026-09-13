@@ -246,15 +246,16 @@ async def login(request: Request):
         keep_blank_values=True,
     )
     password = form.get("password", [""])[0]
-
-    return HTMLResponse(
-        LOGIN_PAGE.replace(
-            "__ERROR__",
-            '<div class="error">Incorrect password. Please try again.</div>'
-        ),
-        status_code=401,
-    )
-
+    
+    if not hmac.compare_digest(password, AUTH_PASSWORD):
+        return HTMLResponse(
+            LOGIN_PAGE.replace(
+                "__ERROR__",
+                '<div class="error">Incorrect password. Please try again.</div>'
+            ),
+            status_code=401,
+        )
+    
     response = RedirectResponse(
         url="/",
         status_code=303,
