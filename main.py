@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -16,6 +17,14 @@ import base64# ============================================================
 
 app = FastAPI(
     title="Open Minds Daily Report Designer"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://abhijeetraj22.github.io"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -246,7 +255,7 @@ async def login(request: Request):
         keep_blank_values=True,
     )
     password = form.get("password", [""])[0]
-    
+
     if not hmac.compare_digest(password, AUTH_PASSWORD):
         return HTMLResponse(
             LOGIN_PAGE.replace(
@@ -255,7 +264,7 @@ async def login(request: Request):
             ),
             status_code=401,
         )
-    
+
     response = RedirectResponse(
         url="/",
         status_code=303,
@@ -266,11 +275,50 @@ async def login(request: Request):
         value=_make_auth_token(),
         max_age=AUTH_MAX_AGE,
         httponly=True,
-        samesite="lax",
-        secure=(request.url.scheme == "https"),
+        samesite="none",
+        secure=True,
         path="/",
     )
 
+    return response
+
+
+@app.post("/verify-code")
+async def verify_code(request: Request):
+    """Verify the GitHub Pages secure code and issue the same auth cookie."""
+    if not AUTH_PASSWORD:
+        return Response(
+            content='{"status":"error","message":"Authentication is not configured."}',
+            status_code=503,
+            media_type="application/json",
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    code = str(payload.get("code", ""))
+    if not hmac.compare_digest(code, AUTH_PASSWORD):
+        return Response(
+            content='{"status":"error","message":"Incorrect password. Please try again."}',
+            status_code=401,
+            media_type="application/json",
+        )
+
+    response = Response(
+        content='{"status":"success"}',
+        media_type="application/json",
+    )
+    response.set_cookie(
+        key=AUTH_COOKIE,
+        value=_make_auth_token(),
+        max_age=AUTH_MAX_AGE,
+        httponly=True,
+        samesite="none",
+        secure=True,
+        path="/",
+    )
     return response
 
 
@@ -297,6 +345,7 @@ async def password_gate(request: Request, call_next):
         "/login",
         "/logout",
         "/health",
+        "/verify-code",
     }
 
     if (
