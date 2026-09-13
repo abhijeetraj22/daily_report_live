@@ -28,15 +28,6 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://abhijeetraj22.github.io"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
-)
-
-
 # ============================================================
 # SERVER-SIDE PASSWORD PROTECTION
 #
@@ -297,45 +288,6 @@ async def login(request: Request):
         path="/",
     )
 
-    return response
-
-
-@app.post("/verify-code")
-async def verify_code(request: Request):
-    """Verify the GitHub Pages secure code and issue the same auth cookie."""
-    if not AUTH_PASSWORD:
-        return Response(
-            content='{"status":"error","message":"Authentication is not configured."}',
-            status_code=503,
-            media_type="application/json",
-        )
-
-    try:
-        payload = await request.json()
-    except Exception:
-        payload = {}
-
-    code = str(payload.get("code", ""))
-    if not hmac.compare_digest(code, AUTH_PASSWORD):
-        return Response(
-            content='{"status":"error","message":"Incorrect password. Please try again."}',
-            status_code=401,
-            media_type="application/json",
-        )
-
-    response = Response(
-        content='{"status":"success"}',
-        media_type="application/json",
-    )
-    response.set_cookie(
-        key=AUTH_COOKIE,
-        value=_make_auth_token(),
-        max_age=AUTH_MAX_AGE,
-        httponly=True,
-        samesite="none",
-        secure=True,
-        path="/",
-    )
     return response
 
 
