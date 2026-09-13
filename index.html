@@ -2430,6 +2430,7 @@
       const REPORT_SERVER = "https://daily-report-live.onrender.com";
       const nativeFetch = window.fetch.bind(window);
       let githubAuthResolve;
+      let githubAuthToken = sessionStorage.getItem("daily_report_github_token") || "";
       const githubAuthReady = new Promise(resolve => { githubAuthResolve = resolve; });
 
       window.fetch = function(input, init = {}) {
@@ -2438,7 +2439,19 @@
           url = REPORT_SERVER + url;
           input = url;
         }
-        const options = { ...init, credentials: "include" };
+
+        const headers = new Headers(
+          typeof input === "string" ? (init.headers || {}) : (init.headers || input.headers || {})
+        );
+        if (githubAuthToken && typeof url === "string" && url.startsWith(REPORT_SERVER)) {
+          headers.set("Authorization", `Bearer ${githubAuthToken}`);
+        }
+
+        const options = {
+          ...init,
+          headers,
+          credentials: "omit",
+        };
         return nativeFetch(input, options);
       };
 
@@ -2459,7 +2472,9 @@
             body: JSON.stringify({ code })
           });
           const data = await response.json().catch(() => ({}));
-          if (response.ok && data.status === "success") {
+          if (response.ok && data.status === "success" && data.token) {
+            githubAuthToken = data.token;
+            sessionStorage.setItem("daily_report_github_token", githubAuthToken);
             document.getElementById("securityOverlay").style.display = "none";
             document.body.style.overflow = "";
             status.textContent = "Authenticated.";
@@ -2478,6 +2493,13 @@
 
       document.addEventListener("DOMContentLoaded", () => {
         document.body.style.overflow = "hidden";
+
+        if (githubAuthToken) {
+          document.getElementById("securityOverlay").style.display = "none";
+          document.body.style.overflow = "";
+          githubAuthResolve(true);
+        }
+
         document.getElementById("unlockButton").addEventListener("click", verifyGithubCode);
         document.getElementById("secureCodeInput").addEventListener("keydown", e => {
           if (e.key === "Enter") verifyGithubCode();
