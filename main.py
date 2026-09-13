@@ -33,9 +33,19 @@ app = FastAPI(
 # Daily Report login password. No new DAILY_REPORT_PASSWORD variable is needed.
 # ============================================================
 
-AUTH_PASSWORD = os.getenv("SECRET_KEY", "").strip()
-# Use the same Render SECRET_KEY to sign the authentication cookie.
-AUTH_SECRET = AUTH_PASSWORD
+# Render uses SECRET_KEY as the Daily Report login password.
+# DAILY_REPORT_PASSWORD is accepted only as an optional override.
+AUTH_PASSWORD = (
+    os.getenv("SECRET_KEY", "").strip()
+    or os.getenv("DAILY_REPORT_PASSWORD", "").strip()
+)
+
+# Prefer a separate signing secret when available; otherwise use the
+# password itself so only one Render variable is required.
+AUTH_SECRET = (
+    os.getenv("DAILY_REPORT_AUTH_SECRET", "").strip()
+    or AUTH_PASSWORD
+)
 
 AUTH_COOKIE = "daily_report_auth"
 AUTH_MAX_AGE = 12 * 60 * 60  # 12 hours
@@ -214,7 +224,7 @@ async def login_page():
     if not AUTH_PASSWORD:
         return HTMLResponse(
             "<h1>Server authentication is not configured.</h1>"
-            "<p>Set SECRET_KEY in Render Environment Variables.</p>",
+            "<p>Set <b>SECRET_KEY</b> in Render Environment Variables.</p>",
             status_code=503,
         )
 
@@ -226,7 +236,7 @@ async def login(request: Request):
     if not AUTH_PASSWORD:
         return HTMLResponse(
             "<h1>Server authentication is not configured.</h1>"
-            "<p>Set SECRET_KEY in Render Environment Variables.</p>",
+            "<p>Set <b>SECRET_KEY</b> in Render Environment Variables.</p>",
             status_code=503,
         )
 
@@ -285,6 +295,7 @@ async def password_gate(request: Request, call_next):
     public_paths = {
         "/login",
         "/logout",
+        "/health",
     }
 
     if (
@@ -360,24 +371,70 @@ class IconSvgRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
+    """
+    Serve index.html directly from the GitHub/Render project root.
 
-    html_file = TEMPLATES_DIR / "index.html"
+    The application does NOT require templates/index.html.
+    It supports both layouts:
+        1. ./index.html
+        2. ./templates/index.html
+    The root index.html is preferred so the GitHub repository can keep
+    main.py and index.html together.
+    """
 
-    if not html_file.exists():
-        return HTMLResponse(
-            """
-            <h1>index.html not found</h1>
-            <p>Please create templates/index.html</p>
-            """,
-            status_code=500
-        )
+    candidate_files = [
+        BASE_DIR / "index.html",
+        TEMPLATES_DIR / "index.html",
+    ]
+
+    for html_file in candidate_files:
+        if html_file.exists() and html_file.is_file():
+            return HTMLResponse(
+                html_file.read_text(encoding="utf-8")
+            )
 
     return HTMLResponse(
-        html_file.read_text(
-            encoding="utf-8"
-        )
+        """
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Daily Report</title>
+        </head>
+        <body style="font-family:Arial;padding:40px">
+          <h1>index.html not found</h1>
+          <p>
+            Put <b>index.html</b> in the same GitHub repository folder
+            as <b>main.py</b>.
+          </p>
+          <p>
+            Expected:
+            <code>/index.html</code>
+          </p>
+        </body>
+        </html>
+        """,
+        status_code=500
     )
 
+
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+async def health():
+    index_root = BASE_DIR / "index.html"
+    index_template = TEMPLATES_DIR / "index.html"
+
+    return {
+        "status": "ok",
+        "index_root": index_root.exists(),
+        "index_template": index_template.exists(),
+        "authentication_configured": bool(AUTH_PASSWORD),
+    }
 
 # ============================================================
 # PARSER
@@ -509,6 +566,146 @@ def suggest_icons(text: str):
         return ["mdi:clipboard-check", "mdi:file-check"]
 
     return ["mdi:clipboard-text", "mdi:file-document", "mdi:clipboard-check"]
+
+
+
+
+# ============================================================
+# JSON REPORT SAVE
+# ============================================================
+
+class SaveReportRequest(BaseModel):
+    date: str
+    day: str = ""
+    title: str = "DESCRIPTION"
+    rows: list = []
+
+
+GITHUB_OWNER = "abhijeetraj22"
+GITHUB_REPO = "daily_report_storage"
+GITHUB_BRANCH = "main"
+GITHUB_JSON_DIR = "json"
+
+
+@app.post("/save-report-json")
+async def save_report_json(request: SaveReportRequest):
+    """
+    Save the current report JSON into:
+    abhijeetraj22/daily_report_storage/json/DD-MM-YYYY.json
+
+    Authentication is already enforced by password_gate.
+    GITHUB_TOKEN remains server-side in Render Environment Variables.
+    """
+
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+
+    if not token:
+        return Response(
+            content="GITHUB_TOKEN is not configured on the Render server.",
+            status_code=503,
+            media_type="text/plain",
+        )
+
+    safe_date = str(request.date or "").strip()
+
+    if not re.fullmatch(r"\d{2}-\d{2}-\d{4}", safe_date):
+        return Response(
+            content="Invalid report date. Expected DD-MM-YYYY.",
+            status_code=400,
+            media_type="text/plain",
+        )
+
+    payload = {
+        "date": safe_date,
+        "day": str(request.day or "").strip(),
+        "title": str(request.title or "DESCRIPTION").strip(),
+        "rows": request.rows if isinstance(request.rows, list) else [],
+    }
+
+    import json
+    encoded_content = base64.b64encode(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+        ).encode("utf-8")
+    ).decode("ascii")
+
+    file_path = f"{GITHUB_JSON_DIR}/{safe_date}.json"
+    api_url = (
+        f"https://api.github.com/repos/"
+        f"{GITHUB_OWNER}/{GITHUB_REPO}/contents/{file_path}"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+
+            # Check whether the file already exists so GitHub can receive
+            # the required SHA for an update.
+            existing_sha = None
+            existing_response = await client.get(
+                api_url,
+                headers=headers,
+                params={"ref": GITHUB_BRANCH},
+            )
+
+            if existing_response.status_code == 200:
+                existing_data = existing_response.json()
+                existing_sha = existing_data.get("sha")
+            elif existing_response.status_code != 404:
+                return Response(
+                    content=(
+                        "GitHub file lookup failed: "
+                        + existing_response.text
+                    ),
+                    status_code=502,
+                    media_type="text/plain",
+                )
+
+            commit_payload = {
+                "message": f"Update Daily Report {safe_date}",
+                "content": encoded_content,
+                "branch": GITHUB_BRANCH,
+            }
+
+            if existing_sha:
+                commit_payload["sha"] = existing_sha
+
+            save_response = await client.put(
+                api_url,
+                headers=headers,
+                json=commit_payload,
+            )
+
+            if save_response.status_code not in (200, 201):
+                return Response(
+                    content=(
+                        "GitHub JSON save failed: "
+                        + save_response.text
+                    ),
+                    status_code=502,
+                    media_type="text/plain",
+                )
+
+            return {
+                "success": True,
+                "date": safe_date,
+                "filename": f"{safe_date}.json",
+                "path": file_path,
+            }
+
+    except Exception as exc:
+        return Response(
+            content=f"JSON save error: {exc}",
+            status_code=502,
+            media_type="text/plain",
+        )
 
 
 # ============================================================
