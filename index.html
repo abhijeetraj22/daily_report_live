@@ -2085,10 +2085,50 @@
           display: none !important;
         }
       }
+
+      /* ============================================================
+           GITHUB PAGES SECURITY OVERLAY
+         ============================================================ */
+      #securityOverlay {
+        position: fixed; inset: 0; z-index: 999999;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(8, 25, 45, 0.88);
+      }
+      .securityBox {
+        width: min(390px, calc(100vw - 32px));
+        padding: 30px 28px; border-radius: 18px;
+        background: white; text-align: center;
+        box-shadow: 0 25px 80px rgba(0,0,0,.35);
+      }
+      .securityBox h2 { margin: 0 0 18px; color: #173f73; }
+      .securityBox input {
+        width: 100%; padding: 13px 14px; border: 1px solid #c8d5e0;
+        border-radius: 9px; font-size: 16px; outline: none; box-sizing: border-box;
+      }
+      .securityBox button {
+        width: 100%; margin-top: 14px; padding: 12px 16px;
+        border: 0; border-radius: 9px; cursor: pointer;
+        color: white; background: #173f73; font-weight: 800; font-size: 15px;
+      }
+      #errorMsg { color: #c72027; min-height: 20px; margin: 10px 0 0; }
+      #loginStatus { color: #60758a; font-size: 12px; margin-top: 8px; }
+
     </style>
   </head>
 
   <body>
+    <!-- ============================================================
+         SECURITY OVERLAY — works on GitHub Pages via Render verification
+         ============================================================ -->
+    <div id="securityOverlay">
+      <div class="securityBox">
+        <h2>🔐 Secure Access</h2>
+        <input type="password" id="secureCodeInput" placeholder="Enter secure code" autocomplete="current-password" />
+        <button type="button" id="unlockButton">Unlock Daily Report</button>
+        <p id="errorMsg"></p>
+        <div id="loginStatus">Verifying securely with the Daily Report server…</div>
+      </div>
+    </div>
     <!-- ============================================================
          APPLICATION BAR
     ============================================================ -->
@@ -2384,6 +2424,66 @@
     ============================================================ -->
 
     <script>
+      /* ============================================================
+           GITHUB PAGES ↔ RENDER API BRIDGE
+         ============================================================ */
+      const REPORT_SERVER = "https://daily-report-live.onrender.com";
+      const nativeFetch = window.fetch.bind(window);
+      let githubAuthResolve;
+      const githubAuthReady = new Promise(resolve => { githubAuthResolve = resolve; });
+
+      window.fetch = function(input, init = {}) {
+        let url = typeof input === "string" ? input : input.url;
+        if (typeof url === "string" && url.startsWith("/api/")) {
+          url = REPORT_SERVER + url;
+          input = url;
+        }
+        const options = { ...init, credentials: "include" };
+        return nativeFetch(input, options);
+      };
+
+      async function verifyGithubCode() {
+        const code = document.getElementById("secureCodeInput").value;
+        const error = document.getElementById("errorMsg");
+        const status = document.getElementById("loginStatus");
+        const button = document.getElementById("unlockButton");
+        error.textContent = "";
+        if (!code) { error.textContent = "Please enter the secure code."; return; }
+        button.disabled = true; button.textContent = "Checking…";
+        status.textContent = "Checking secure code…";
+        try {
+          const response = await nativeFetch(REPORT_SERVER + "/verify-code", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (response.ok && data.status === "success") {
+            document.getElementById("securityOverlay").style.display = "none";
+            document.body.style.overflow = "";
+            status.textContent = "Authenticated.";
+            if (githubAuthResolve) githubAuthResolve(true);
+            return;
+          }
+          error.textContent = data.message || "❌ Wrong Code!";
+          status.textContent = "Authentication failed.";
+        } catch (e) {
+          error.textContent = "❌ Server connection failed. Please try again.";
+          status.textContent = "Could not contact the Daily Report server.";
+        } finally {
+          button.disabled = false; button.textContent = "Unlock Daily Report";
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        document.body.style.overflow = "hidden";
+        document.getElementById("unlockButton").addEventListener("click", verifyGithubCode);
+        document.getElementById("secureCodeInput").addEventListener("keydown", e => {
+          if (e.key === "Enter") verifyGithubCode();
+        });
+      });
+
       /* ============================================================
            STATE
         ============================================================ */
@@ -4060,6 +4160,7 @@
          ============================================================ */
 
       (async () => {
+        await githubAuthReady;
         const today = getTodayDate();
 
         const myLoadVersion = ++dateLoadVersion;
