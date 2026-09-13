@@ -2597,35 +2597,84 @@
            GENERATE REPORT
         ============================================================ */
 
+      function parseReportClientSide(text) {
+        const lines = String(text || "").split(/\r?\n/).map(line => line.trim());
+        const sections = [];
+        let currentSection = null;
+
+        for (const line of lines) {
+          if (!line) continue;
+
+          const sectionMatch = line.match(/^\*(.+?)\*$/);
+          if (sectionMatch) {
+            currentSection = { title: sectionMatch[1].trim(), items: [] };
+            sections.push(currentSection);
+            continue;
+          }
+
+          if (line.startsWith("*")) {
+            const clean = line.replace(/^\*+/, "").trim();
+            if (!clean) continue;
+
+            if (!currentSection) {
+              currentSection = { title: "DESCRIPTION", items: [] };
+              sections.push(currentSection);
+            }
+
+            currentSection.items.push({
+              text: clean,
+              icons: [suggestLoadedIcon(clean)],
+            });
+          }
+        }
+
+        return { sections };
+      }
+
       async function generateReport() {
         updateHeader();
 
         try {
-          const response = await fetch("/api/parse", {
-            method: "POST",
+          let data = null;
 
-            headers: {
-              "Content-Type": "application/json",
-            },
+          try {
+            const response = await fetch("/api/parse", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                text: $("source").value,
+              }),
+            });
 
-            body: JSON.stringify({
-              text: $("source").value,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error("Parser error");
+            if (response.ok) {
+              data = await response.json();
+            } else {
+              console.warn("Render parser unavailable: HTTP", response.status);
+            }
+          } catch (serverError) {
+            console.warn("Render parser connection failed; using local parser:", serverError);
           }
 
-          const data = await response.json();
+          /*
+           * GitHub Pages can continue generating even if the protected
+           * Render parser is temporarily unavailable.  The local parser
+           * uses the same report syntax and the same semantic icon rules.
+           */
+          if (!data || !Array.isArray(data.sections)) {
+            data = parseReportClientSide($("source").value);
+          }
 
           state.sections = data.sections || [];
 
+          /* Keep existing manual selections for the current date. */
+          restoreIconsForDate(getReportDate(), state.iconOverrides);
+
           await renderRows();
         } catch (error) {
-          console.error(error);
-
-          alert("Unable to generate the report.");
+          console.error("Generate report error:", error);
+          alert("Unable to generate the report.\n\n" + (error.message || error));
         }
       }
 
@@ -2678,8 +2727,13 @@
         ============================================================ */
 
       async function getIconSvg(iconName) {
-        if (state.iconCache[iconName]) {
-          return state.iconCache[iconName];
+        const originalName = String(iconName || "").trim();
+        if (!originalName) return "";
+
+        const name = originalName.includes(":") ? originalName : "mdi:" + originalName;
+
+        if (state.iconCache[name]) {
+          return state.iconCache[name];
         }
 
         try {
@@ -2688,13 +2742,6 @@
            * This avoids protected Render API/CORS authentication for icons
            * and makes icons work identically on Render and GitHub Pages.
            */
-          let name = String(iconName || "").trim();
-          if (!name) return "";
-
-          if (!name.includes(":")) {
-            name = "mdi:" + name;
-          }
-
           const encodedName = encodeURIComponent(name);
           const response = await nativeFetch(
             "https://api.iconify.design/" +
@@ -2709,7 +2756,7 @@
           const svg = await response.text();
 
           if (svg && svg.includes("<svg")) {
-            state.iconCache[iconName] = svg;
+            state.iconCache[name] = svg;
             return svg;
           }
         } catch (error) {
@@ -3849,7 +3896,8 @@
 
             sections.forEach((section) => {
               section.items.forEach((item) => {
-                if (!item.icons.length) item.icons = ["mdi:clipboard-text"];
+                const semantic = suggestLoadedIcon(item.text || "");
+                item.icons = [semantic || "mdi:clipboard-text"];
               });
             });
           }
