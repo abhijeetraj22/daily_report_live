@@ -516,8 +516,10 @@ def parse_report(text: str):
         # SECTION
         # ----------------------------------------------------
 
+        # A section is ONLY one leading `*` + one trailing `*`.
+        # `**task**` is a task, not a section. Internal `*` markers are kept.
         section_match = re.match(
-            r"^\*(.+?)\*$",
+            r"^\*(?!\*)(.+?)(?<!\*)\*$",
             line
         )
 
@@ -542,7 +544,11 @@ def parse_report(text: str):
 
         if line.startswith("*"):
 
-            clean = line.lstrip("*").strip()
+            # Support both `* task` and `**task**` without removing internal `*`.
+            if line.startswith("**") and line.endswith("**") and len(line) >= 4:
+                clean = line[2:-2].strip()
+            else:
+                clean = line[1:].strip()
 
             if not clean:
                 continue
@@ -583,9 +589,6 @@ def suggest_icons(text: str):
     rules = [
         (("printed" , "question paper"), ["mdi:printer", "mdi:file-document-edit"]),
         (("formatted", "question paper"), ["mdi:file-document-edit", "mdi:format-align-left"]),
-        (("collected notebooks",), ["mdi:notebook-multiple", "mdi:book-multiple"]),
-        (("homework feedback", "google form"), ["mdi:form-select", "mdi:clipboard-check"]),
-        (("dispersal duty",), ["mdi:account-multiple-check", "mdi:account-group"]),
         (("q/a",), ["mdi:clipboard-text", "mdi:help-circle"]),
         (("re-arranged", "bundle"), ["mdi:package-variant-closed", "mdi:archive-outline"]),
         (("distributed", "answer-copy"), ["mdi:account-multiple", "mdi:clipboard-check"]),
@@ -606,6 +609,9 @@ def suggest_icons(text: str):
         (("verify",), ["mdi:clipboard-check", "mdi:check-decagram"]),
         (("bus",), ["mdi:bus", "mdi:bus-school"]),
         (("email",), ["mdi:email", "mdi:email-outline"]),
+        (("collected notebooks",), ["mdi:notebook-multiple", "mdi:book-multiple"]),
+        (("collected homework feedback", "google form"), ["mdi:form-select", "mdi:clipboard-check"]),
+        (("dispersal duty",), ["mdi:account-multiple-check", "mdi:account-group"]),
         (("message",), ["mdi:message-text", "mdi:message"]),
     ]
 
