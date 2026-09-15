@@ -2681,22 +2681,6 @@
 
           state.sections = data.sections || [];
 
-          /*
-           * The server may be running an older parser or may return a generic
-           * clipboard icon.  Known phrases must always use the client semantic
-           * rule, while a real manually selected icon remains untouched.
-           */
-          state.sections.forEach((section) => {
-            (section.items || []).forEach((item) => {
-              const serverIcon = item.icons?.[0] || "";
-              const semanticIcon = suggestLoadedIcon(item.text || "");
-
-              if (semanticIcon !== "mdi:clipboard-text") {
-                item.icons = [semanticIcon];
-              }
-            });
-          });
-
           await renderRows();
         } catch (error) {
           console.error(error);
@@ -3603,7 +3587,6 @@
           date: getReportDate(),
           day: $("day").value.trim() || "",
           title: $("title").value.trim() || "DESCRIPTION",
-          source: $("source").value || "",
           rows,
         };
       }
@@ -3737,13 +3720,6 @@
         const t = String(text || "")
           .toLowerCase()
           .trim();
-
-        /* Specific task phrases MUST come before generic rules. */
-        if (t.includes("collected homework feedback") &&
-            t.includes("google form"))
-          return "mdi:form-select";
-        if (t.includes("collected notebooks"))
-          return "mdi:notebook-multiple";
 
         if (t.includes("printed") && t.includes("question paper"))
           return "mdi:printer";
@@ -3883,16 +3859,7 @@
            * date has been loaded.  A date with no saved JSON stays blank.
            * This is intentionally based only on that date's JSON rows.
            */
-          /*
-           * Preserve the exact text the user originally entered whenever a
-           * newer JSON file contains `source`.  This prevents internal `*`
-           * characters from being reinterpreted or moved when a date is loaded.
-           * Older JSON files fall back to the row-based reconstruction.
-           */
-          $("source").value =
-            typeof data.source === "string" && data.source.length
-              ? data.source
-              : sourceLines.join("\n\n");
+          $("source").value = sourceLines.join("\n\n");
 
           /* ============================================================
              REBUILD SEMANTIC ICONS FOR THE LOADED DATE
