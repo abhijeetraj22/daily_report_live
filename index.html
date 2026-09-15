@@ -2682,16 +2682,17 @@
           state.sections = data.sections || [];
 
           /*
-           * IMPORTANT:
-           * The Render parser may return mdi:clipboard-text for sentences
-           * that do not have a server-side semantic rule. Never let that
-           * generic icon override the frontend semantic rules.
+           * The server may be running an older parser or may return a generic
+           * clipboard icon.  Known phrases must always use the client semantic
+           * rule, while a real manually selected icon remains untouched.
            */
           state.sections.forEach((section) => {
             (section.items || []).forEach((item) => {
               const serverIcon = item.icons?.[0] || "";
-              if (!serverIcon || isGenericClipboardIcon(serverIcon)) {
-                item.icons = [suggestLoadedIcon(item.text || "")];
+              const semanticIcon = suggestLoadedIcon(item.text || "");
+
+              if (semanticIcon !== "mdi:clipboard-text") {
+                item.icons = [semanticIcon];
               }
             });
           });
@@ -3737,19 +3738,17 @@
           .toLowerCase()
           .trim();
 
+        /* Specific task phrases MUST come before generic rules. */
+        if (t.includes("collected homework feedback") &&
+            t.includes("google form"))
+          return "mdi:form-select";
+        if (t.includes("collected notebooks"))
+          return "mdi:notebook-multiple";
+
         if (t.includes("printed") && t.includes("question paper"))
           return "mdi:printer";
         if (t.includes("formatted") && t.includes("question paper"))
           return "mdi:file-document-edit";
-
-        /* Specific daily-report tasks. */
-        if (t.includes("collected notebooks"))
-          return "mdi:notebook-multiple";
-        if (t.includes("homework feedback") && t.includes("google form"))
-          return "mdi:form-select";
-        if (t.includes("dispersal duty"))
-          return "mdi:account-multiple-check";
-
         if (t.includes("q/a")) return "mdi:clipboard-text";
         if (t.includes("re-arranged") && t.includes("bundle"))
           return "mdi:package-variant-closed";
@@ -3885,12 +3884,13 @@
            * This is intentionally based only on that date's JSON rows.
            */
           /*
-           * Preserve the exact Daily Report Text for new JSON files.
-           * This prevents internal asterisks from being reformatted.
-           * Older JSON files use the reconstructed source as a fallback.
+           * Preserve the exact text the user originally entered whenever a
+           * newer JSON file contains `source`.  This prevents internal `*`
+           * characters from being reinterpreted or moved when a date is loaded.
+           * Older JSON files fall back to the row-based reconstruction.
            */
           $("source").value =
-            typeof data.source === "string" && data.source.trim()
+            typeof data.source === "string" && data.source.length
               ? data.source
               : sourceLines.join("\n\n");
 
