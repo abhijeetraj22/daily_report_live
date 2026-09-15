@@ -498,22 +498,10 @@ async def health():
 
 def parse_report(text: str):
 
-    # IMPORTANT: Every pasted line beginning with "*" is a separate point.
-    # A multi-line **...** wrapper is only formatting and must never cause
-    # multiple point lines to be merged into one sentence.
-    raw_lines = [line.rstrip() for line in text.splitlines()]
-    nonempty = [i for i, value in enumerate(raw_lines) if value.strip()]
-    first_nonempty = nonempty[0] if nonempty else None
-    last_nonempty = nonempty[-1] if nonempty else None
-
-    lines = []
-    for i, raw_line in enumerate(raw_lines):
-        line = raw_line.strip()
-        if line and i == first_nonempty and line.startswith("**") and not line.endswith("**"):
-            line = "*" + line[2:].lstrip()
-        if line and i == last_nonempty and line.endswith("**") and not line.startswith("**"):
-            line = line[:-2].rstrip()
-        lines.append(line)
+    lines = [
+        line.strip()
+        for line in text.splitlines()
+    ]
 
     sections = []
 
@@ -528,10 +516,8 @@ def parse_report(text: str):
         # SECTION
         # ----------------------------------------------------
 
-        # A section is ONLY one leading `*` + one trailing `*`.
-        # `**task**` is a task, not a section. Internal `*` markers are kept.
         section_match = re.match(
-            r"^\*(?!\*)(.+?)(?<!\*)\*$",
+            r"^\*(.+?)\*$",
             line
         )
 
@@ -556,11 +542,7 @@ def parse_report(text: str):
 
         if line.startswith("*"):
 
-            # Support both `* task` and `**task**` without removing internal `*`.
-            if line.startswith("**") and line.endswith("**") and len(line) >= 4:
-                clean = line[2:-2].strip()
-            else:
-                clean = line[1:].strip()
+            clean = line.lstrip("*").strip()
 
             if not clean:
                 continue
@@ -601,6 +583,9 @@ def suggest_icons(text: str):
     rules = [
         (("printed" , "question paper"), ["mdi:printer", "mdi:file-document-edit"]),
         (("formatted", "question paper"), ["mdi:file-document-edit", "mdi:format-align-left"]),
+        (("collected notebooks",), ["mdi:notebook-multiple", "mdi:book-multiple"]),
+        (("homework feedback", "google form"), ["mdi:form-select", "mdi:clipboard-check"]),
+        (("dispersal duty",), ["mdi:account-multiple-check", "mdi:account-group"]),
         (("q/a",), ["mdi:clipboard-text", "mdi:help-circle"]),
         (("re-arranged", "bundle"), ["mdi:package-variant-closed", "mdi:archive-outline"]),
         (("distributed", "answer-copy"), ["mdi:account-multiple", "mdi:clipboard-check"]),
@@ -621,9 +606,6 @@ def suggest_icons(text: str):
         (("verify",), ["mdi:clipboard-check", "mdi:check-decagram"]),
         (("bus",), ["mdi:bus", "mdi:bus-school"]),
         (("email",), ["mdi:email", "mdi:email-outline"]),
-        (("collected notebooks",), ["mdi:notebook-multiple", "mdi:book-multiple"]),
-        (("collected homework feedback", "google form"), ["mdi:form-select", "mdi:clipboard-check"]),
-        (("dispersal duty",), ["mdi:account-multiple-check", "mdi:account-group"]),
         (("message",), ["mdi:message-text", "mdi:message"]),
     ]
 
