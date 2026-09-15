@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: daily-report-s9yq
+    name: daily-report-live
     runtime: python
 
     buildCommand: pip install -r requirements.txt
@@ -10,3 +10,9 @@ services:
     healthCheckPath: /health
 
     autoDeploy: true
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: GITHUB_TOKEN
+        sync: false
