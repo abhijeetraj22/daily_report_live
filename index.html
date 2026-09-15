@@ -1241,8 +1241,9 @@
         min-width: 0;
 
         display: flex;
-
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
 
         padding: 8px 12px;
 
@@ -1257,12 +1258,34 @@
         line-height: 1.18;
       }
 
-      .task-text span {
+      .task-main-text {
         display: block;
-
         width: 100%;
-
         overflow-wrap: anywhere;
+      }
+
+      /* Bullet sub-points belong to the SAME numbered task. */
+      .task-bullets {
+        width: 100%;
+        margin: 5px 0 0;
+        padding: 0 0 0 28px;
+        list-style: none;
+      }
+
+      .task-bullets li {
+        position: relative;
+        margin: 1px 0;
+        padding-left: 15px;
+        overflow-wrap: anywhere;
+      }
+
+      .task-bullets li::before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-size: 1.05em;
+        font-weight: 900;
       }
 
       /* ============================================================
@@ -2682,6 +2705,103 @@
           state.sections = data.sections || [];
 
           /*
+           * SOURCE-FIRST SAFETY NET
+           *
+           * Important rule:
+           *   * Main task
+           *   * sub-point
+           *   * sub-point
+           *
+           * becomes ONE numbered row with bullet sub-points.
+           *
+           * For the user's class-list format, a class line such as
+           * `* 5 DELTA [SANSKRIT]` is a sub-bullet when the previous
+           * main task ends with `:`.
+           */
+          const sourceLines = $("source").value
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          function isClassSubBulletLine(line) {
+            if (!line || !line.startsWith("*")) return false;
+
+            const value = line.slice(1).trim();
+
+            return /^\d+\s+[A-Za-z0-9_-]+\s+\[[^\]]+\]$/.test(value);
+          }
+
+          const rebuiltSections = [];
+          let rebuiltSection = null;
+
+          sourceLines.forEach((line) => {
+            const isSection =
+              /^\*(?!\*)(.+?)(?<!\*)\*$/.test(line);
+
+            if (isSection) {
+              rebuiltSection = {
+                title: line.slice(1, -1).trim(),
+                items: [],
+              };
+
+              rebuiltSections.push(rebuiltSection);
+              return;
+            }
+
+            if (!line.startsWith("*")) return;
+
+            let clean = line;
+
+            if (clean.startsWith("**") && clean.endsWith("**")) {
+              clean = clean.slice(2, -2).trim();
+            } else {
+              clean = clean.slice(1).trim();
+            }
+
+            if (!clean) return;
+
+            if (!rebuiltSection) {
+              rebuiltSection = {
+                title: "DESCRIPTION",
+                items: [],
+              };
+
+              rebuiltSections.push(rebuiltSection);
+            }
+
+            const previousItem =
+              rebuiltSection.items[rebuiltSection.items.length - 1];
+
+            /*
+             * CLASS LINES ARE BULLETS, NOT NEW NUMBERED POINTS.
+             */
+            if (
+              previousItem &&
+              previousItem.text.trim().endsWith(":") &&
+              isClassSubBulletLine(line)
+            ) {
+              previousItem.bullets = previousItem.bullets || [];
+              previousItem.bullets.push(clean);
+              return;
+            }
+
+            rebuiltSection.items.push({
+              text: clean,
+              bullets: [],
+              icons: [suggestLoadedIcon(clean)],
+            });
+          });
+
+          /*
+           * If the source was successfully rebuilt, use it as the source
+           * of truth. This prevents old Render parser behavior from turning
+           * bullet sub-points into numbered rows.
+           */
+          if (rebuiltSections.length) {
+            state.sections = rebuiltSections;
+          }
+
+          /*
            * The server may be running an older parser or may return a generic
            * clipboard icon.  Known phrases must always use the client semantic
            * rule, while a real manually selected icon remains untouched.
@@ -2735,6 +2855,11 @@
 
               /* IMPORTANT */
               remark: remark,
+
+              /* BULLET SUB-POINTS stay inside this one numbered row. */
+              bullets: Array.isArray(item.bullets)
+                ? item.bullets.map((bullet) => String(bullet || "").trim()).filter(Boolean)
+                : [],
 
               sectionTitle: section.title,
 
@@ -2873,9 +2998,20 @@
 
                     <div class="task-text">
 
-                        <span>
+                        <div class="task-main-text">
                             ${escapeHtml(item.text)}
-                        </span>
+                        </div>
+
+                        ${
+                          item.bullets && item.bullets.length
+                            ? `<ul class="task-bullets">${item.bullets
+                                .map(
+                                  (bullet) =>
+                                    `<li>${escapeHtml(bullet)}</li>`
+                                )
+                                .join("")}</ul>`
+                            : ""
+                        }
 
                     </div>
 
@@ -3592,6 +3728,9 @@
               "",
               String(item.remark || ""),
             ],
+            bullets: Array.isArray(item.bullets)
+              ? item.bullets.map((bullet) => String(bullet || "").trim()).filter(Boolean)
+              : [],
             icon:
               state.iconOverrides[item.key] ||
               (item.icons && item.icons[0]) ||
@@ -3861,6 +4000,9 @@
 
             currentSection.items.push({
               text: remark ? `${description} | ${remark}` : description,
+              bullets: Array.isArray(row.bullets)
+                ? row.bullets.map((bullet) => String(bullet || "").trim()).filter(Boolean)
+                : [],
               /*
                * row.icon may be a real manually selected icon, but older
                * saved JSON files contain mdi:clipboard-text for every row.
@@ -3889,10 +4031,77 @@
            * characters from being reinterpreted or moved when a date is loaded.
            * Older JSON files fall back to the row-based reconstruction.
            */
+          const savedSource =
+            typeof data.source === "string" ? data.source : "";
+
           $("source").value =
-            typeof data.source === "string" && data.source.length
-              ? data.source
+            savedSource.length
+              ? savedSource
               : sourceLines.join("\n\n");
+
+          /*
+           * SOURCE-FIRST RESTORE:
+           * Re-parse the original saved source text so every pasted point
+           * remains a separate report row. Never rebuild point-wise input
+           * from an older flattened JSON row.
+           */
+          if (savedSource.trim()) {
+            try {
+              const sourceResponse = await fetch("/api/parse", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: savedSource }),
+              });
+
+              if (sourceResponse.ok) {
+                const sourceData = await sourceResponse.json();
+                const parsedSections = Array.isArray(sourceData.sections)
+                  ? sourceData.sections
+                  : [];
+
+                const savedIconByText = new Map();
+
+                rows.forEach((row) => {
+                  if (row.type !== "data") return;
+                  const cells = Array.isArray(row.cells) ? row.cells : [];
+                  const text = String(cells[1] || "").trim();
+                  const icon = String(row.icon || "").trim();
+
+                  if (text && icon && !isGenericClipboardIcon(icon)) {
+                    savedIconByText.set(text, icon);
+                  }
+                });
+
+                parsedSections.forEach((section) => {
+                  (section.items || []).forEach((item) => {
+                    item.bullets = Array.isArray(item.bullets)
+                      ? item.bullets.map((bullet) => String(bullet || "").trim()).filter(Boolean)
+                      : [];
+                  });
+                });
+
+                parsedSections.forEach((section) => {
+                  (section.items || []).forEach((item) => {
+                    const text = String(item.text || "").trim();
+                    const savedIcon = savedIconByText.get(text);
+                    item.bullets = Array.isArray(item.bullets)
+                      ? item.bullets.map((bullet) => String(bullet || "").trim()).filter(Boolean)
+                      : [];
+                    item.icons = [
+                      savedIcon || suggestLoadedIcon(text),
+                    ];
+                  });
+                });
+
+                state.sections = parsedSections;
+              }
+            } catch (sourceParseError) {
+              console.warn(
+                "Source-first restore failed; retaining saved rows.",
+                sourceParseError
+              );
+            }
+          }
 
           /* ============================================================
              REBUILD SEMANTIC ICONS FOR THE LOADED DATE
@@ -3904,8 +4113,9 @@
              Generate Report so each sentence receives its appropriate
              semantic icon (printer, certificate, student, attendance, etc.).
           */
-          try {
-            const semanticSource = [];
+          if (!savedSource.trim()) {
+            try {
+              const semanticSource = [];
 
             rows.forEach((row) => {
               const cells = Array.isArray(row.cells) ? row.cells : [];
@@ -3923,6 +4133,13 @@
                   semanticSource.push(
                     `* ${description}${remark ? ` | ${remark}` : ""}`,
                   );
+
+                  if (Array.isArray(row.bullets)) {
+                    row.bullets.forEach((bullet) => {
+                      const cleanBullet = String(bullet || "").trim();
+                      if (cleanBullet) semanticSource.push(`* ${cleanBullet}`);
+                    });
+                  }
                 }
               }
             });
@@ -3991,17 +4208,18 @@
                 });
               }
             }
-          } catch (semanticError) {
-            console.warn(
-              "Could not rebuild semantic icons for loaded date:",
-              semanticError,
-            );
+            } catch (semanticError) {
+              console.warn(
+                "Could not rebuild semantic icons for loaded date:",
+                semanticError,
+              );
 
-            sections.forEach((section) => {
-              section.items.forEach((item) => {
-                if (!item.icons.length) item.icons = ["mdi:clipboard-text"];
+              sections.forEach((section) => {
+                section.items.forEach((item) => {
+                  if (!item.icons.length) item.icons = ["mdi:clipboard-text"];
+                });
               });
-            });
+            }
           }
 
           /*
