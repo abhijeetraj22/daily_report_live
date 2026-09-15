@@ -498,10 +498,22 @@ async def health():
 
 def parse_report(text: str):
 
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-    ]
+    # IMPORTANT: Every pasted line beginning with "*" is a separate point.
+    # A multi-line **...** wrapper is only formatting and must never cause
+    # multiple point lines to be merged into one sentence.
+    raw_lines = [line.rstrip() for line in text.splitlines()]
+    nonempty = [i for i, value in enumerate(raw_lines) if value.strip()]
+    first_nonempty = nonempty[0] if nonempty else None
+    last_nonempty = nonempty[-1] if nonempty else None
+
+    lines = []
+    for i, raw_line in enumerate(raw_lines):
+        line = raw_line.strip()
+        if line and i == first_nonempty and line.startswith("**") and not line.endswith("**"):
+            line = "*" + line[2:].lstrip()
+        if line and i == last_nonempty and line.endswith("**") and not line.startswith("**"):
+            line = line[:-2].rstrip()
+        lines.append(line)
 
     sections = []
 
