@@ -3929,6 +3929,11 @@
         if (t.includes("collected notebooks"))
           return "mdi:notebook-multiple";
 
+        /* Google Sheet status update is a spreadsheet task, NOT a bundle. */
+        if (t.includes("updated the google sheet") &&
+            t.includes("submission status"))
+          return "mdi:google-spreadsheet";
+
         /* Dispersal Duty must NEVER fall back to the generic clipboard icon. */
         if (t.includes("dispersal duty"))
           return "mdi:account-multiple-check";
@@ -4056,6 +4061,21 @@
               sourceLines.push(
                 `* ${description}${remark ? ` | ${remark}` : ""}`,
               );
+
+              /*
+               * IMPORTANT:
+               * Restore bullet sub-points as separate bullet lines in the
+               * Daily Report Text editor. They must NOT be flattened into
+               * the parent sentence.
+               */
+              if (Array.isArray(row.bullets)) {
+                row.bullets.forEach((bullet) => {
+                  const cleanBullet = String(bullet || "").trim();
+                  if (cleanBullet) {
+                    sourceLines.push(`* ${cleanBullet}`);
+                  }
+                });
+              }
             }
 
             const itemIndex = currentSection.items.length;
@@ -4100,8 +4120,46 @@
           const savedSource =
             typeof data.source === "string" ? data.source : "";
 
+          /*
+           * A previous version could save `rows.bullets` correctly while
+           * leaving `source` empty/flattened. In that case the editor must
+           * be rebuilt from rows WITH their bullet lines.
+           *
+           * If savedSource already contains every saved bullet as its own
+           * `* bullet` line, preserve the exact original source.
+           * Otherwise use the bullet-aware reconstruction above.
+           */
+          const savedRowsHaveBullets = rows.some(
+            (row) =>
+              row.type === "data" &&
+              Array.isArray(row.bullets) &&
+              row.bullets.some((bullet) => String(bullet || "").trim())
+          );
+
+          const savedSourceHasAllBullets =
+            !savedRowsHaveBullets ||
+            rows
+              .filter(
+                (row) =>
+                  row.type === "data" &&
+                  Array.isArray(row.bullets) &&
+                  row.bullets.length
+              )
+              .every((row) =>
+                row.bullets.every((bullet) => {
+                  const cleanBullet = String(bullet || "").trim();
+                  return savedSource
+                    .split(/\r?\n/)
+                    .some(
+                      (line) =>
+                        line.trim() === `* ${cleanBullet}` ||
+                        line.trim() === `**${cleanBullet}**`
+                    );
+                })
+              );
+
           $("source").value =
-            savedSource.length
+            savedSource.length && savedSourceHasAllBullets
               ? savedSource
               : sourceLines.join("\n\n");
 
