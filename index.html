@@ -1533,6 +1533,57 @@
         z-index: 20 !important;
       }
       /* ============================================================
+           SAVE STATUS TOAST
+           Reliable in-page confirmation for PNG/JSON saves.
+           This is used instead of relying only on browser alert().
+        ============================================================ */
+      #saveStatus {
+        position: fixed;
+        right: 22px;
+        bottom: 22px;
+        z-index: 1000000;
+        min-width: 320px;
+        max-width: min(520px, calc(100vw - 44px));
+        padding: 15px 18px;
+        border-radius: 12px;
+        color: white;
+        background: #173f73;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.4;
+        opacity: 0;
+        transform: translateY(14px);
+        pointer-events: none;
+        transition: opacity .2s ease, transform .2s ease;
+      }
+
+      #saveStatus.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      #saveStatus.success {
+        background: #198754;
+      }
+
+      #saveStatus.error {
+        background: #c72027;
+      }
+
+      #saveStatus .save-status-title {
+        font-size: 15px;
+        margin-bottom: 3px;
+      }
+
+      #saveStatus .save-status-detail {
+        font-size: 12px;
+        font-weight: 600;
+        opacity: .94;
+      }
+
+      /* ============================================================
            PRINT / PDF
 
            A4 LANDSCAPE
@@ -2130,6 +2181,15 @@
       </div>
     </div>
     <!-- ============================================================
+         SAVE STATUS
+         Reliable visual confirmation for JSON/PNG operations.
+         ============================================================ -->
+    <div id="saveStatus" role="status" aria-live="polite" aria-atomic="true">
+      <div class="save-status-title" id="saveStatusTitle"></div>
+      <div class="save-status-detail" id="saveStatusDetail"></div>
+    </div>
+
+    <!-- ============================================================
          APPLICATION BAR
     ============================================================ -->
 
@@ -2260,10 +2320,10 @@
                 <div class="logo-wrapper">
                   <img
                     class="school-logo-image"
-                    src="https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.jpg"
+                    src="/static/images/school-logo.jpg"
                     onerror="
                       this.onerror = null;
-                      this.src = 'https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.png';
+                      this.src = '/static/images/school-logo.png';
                     "
                     alt="Open Minds School Logo"
                   />
@@ -2280,7 +2340,7 @@
                 <div class="header-art">
                   <img
                     class="header-art-image"
-                    src="https://abhijeetraj22.github.io/daily_report_live/static/images/header-art.png"
+                    src="/static/images/header-art.png"
                     alt="Clipboard books and pen"
                   />
                 </div>
@@ -2597,84 +2657,35 @@
            GENERATE REPORT
         ============================================================ */
 
-      function parseReportClientSide(text) {
-        const lines = String(text || "").split(/\r?\n/).map(line => line.trim());
-        const sections = [];
-        let currentSection = null;
-
-        for (const line of lines) {
-          if (!line) continue;
-
-          const sectionMatch = line.match(/^\*(.+?)\*$/);
-          if (sectionMatch) {
-            currentSection = { title: sectionMatch[1].trim(), items: [] };
-            sections.push(currentSection);
-            continue;
-          }
-
-          if (line.startsWith("*")) {
-            const clean = line.replace(/^\*+/, "").trim();
-            if (!clean) continue;
-
-            if (!currentSection) {
-              currentSection = { title: "DESCRIPTION", items: [] };
-              sections.push(currentSection);
-            }
-
-            currentSection.items.push({
-              text: clean,
-              icons: [suggestLoadedIcon(clean)],
-            });
-          }
-        }
-
-        return { sections };
-      }
-
       async function generateReport() {
         updateHeader();
 
         try {
-          let data = null;
+          const response = await fetch("/api/parse", {
+            method: "POST",
 
-          try {
-            const response = await fetch("/api/parse", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                text: $("source").value,
-              }),
-            });
+            headers: {
+              "Content-Type": "application/json",
+            },
 
-            if (response.ok) {
-              data = await response.json();
-            } else {
-              console.warn("Render parser unavailable: HTTP", response.status);
-            }
-          } catch (serverError) {
-            console.warn("Render parser connection failed; using local parser:", serverError);
+            body: JSON.stringify({
+              text: $("source").value,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Parser error");
           }
 
-          /*
-           * GitHub Pages can continue generating even if the protected
-           * Render parser is temporarily unavailable.  The local parser
-           * uses the same report syntax and the same semantic icon rules.
-           */
-          if (!data || !Array.isArray(data.sections)) {
-            data = parseReportClientSide($("source").value);
-          }
+          const data = await response.json();
 
           state.sections = data.sections || [];
 
-          /* Keep existing manual selections for the current date. */
-          restoreIconsForDate(getReportDate(), state.iconOverrides);
-
           await renderRows();
         } catch (error) {
-          console.error("Generate report error:", error);
-          alert("Unable to generate the report.\n\n" + (error.message || error));
+          console.error(error);
+
+          alert("Unable to generate the report.");
         }
       }
 
@@ -2727,37 +2738,29 @@
         ============================================================ */
 
       async function getIconSvg(iconName) {
-        const originalName = String(iconName || "").trim();
-        if (!originalName) return "";
-
-        const name = originalName.includes(":") ? originalName : "mdi:" + originalName;
-
-        if (state.iconCache[name]) {
-          return state.iconCache[name];
+        if (state.iconCache[iconName]) {
+          return state.iconCache[iconName];
         }
 
         try {
-          /*
-           * Icons are public artwork, so load them directly from Iconify.
-           * This avoids protected Render API/CORS authentication for icons
-           * and makes icons work identically on Render and GitHub Pages.
-           */
-          const encodedName = encodeURIComponent(name);
-          const response = await nativeFetch(
-            "https://api.iconify.design/" +
-            encodedName +
-            ".svg?height=1em&width=1em"
-          );
+          const response = await fetch("/api/icons/svg", {
+            method: "POST",
 
-          if (!response.ok) {
-            throw new Error("Iconify HTTP " + response.status);
-          }
+            headers: {
+              "Content-Type": "application/json",
+            },
 
-          const svg = await response.text();
+            body: JSON.stringify({
+              name: iconName,
+            }),
+          });
 
-          if (svg && svg.includes("<svg")) {
-            state.iconCache[name] = svg;
-            return svg;
+          const data = await response.json();
+
+          if (data.svg) {
+            state.iconCache[iconName] = data.svg;
+
+            return data.svg;
           }
         } catch (error) {
           console.error("Icon SVG error:", error);
@@ -3448,6 +3451,38 @@
       }
 
       /* ============================================================
+           SAVE STATUS HELPERS
+        ============================================================ */
+
+      let saveStatusTimer = null;
+
+      function showSaveStatus(type, title, detail, duration = 4500) {
+        const box = $("saveStatus");
+        const titleElement = $("saveStatusTitle");
+        const detailElement = $("saveStatusDetail");
+
+        if (!box || !titleElement || !detailElement) return;
+
+        clearTimeout(saveStatusTimer);
+
+        box.classList.remove("success", "error", "show");
+        box.classList.add(type === "error" ? "error" : "success");
+
+        titleElement.textContent = title || "";
+        detailElement.textContent = detail || "";
+
+        requestAnimationFrame(() => {
+          box.classList.add("show");
+        });
+
+        if (duration > 0) {
+          saveStatusTimer = setTimeout(() => {
+            box.classList.remove("show");
+          }, duration);
+        }
+      }
+
+      /* ============================================================
            JSON SAVE / LOAD - SAME STORAGE AS OLD VERSION
         ============================================================ */
 
@@ -3556,7 +3591,7 @@
         };
       }
 
-      async function saveReportJson(showAlert = true) {
+      async function saveReportJson(showAlert = false) {
         const reportData = collectReportData();
 
         try {
@@ -3566,19 +3601,54 @@
             body: JSON.stringify(reportData),
           });
 
+          /* Read the server response so a successful HTTP response is
+             confirmed before reporting that the JSON was saved. */
+          const responseText = await response.text().catch(() => "");
+
           if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            let serverMessage = responseText.trim();
+
+            try {
+              const serverData = JSON.parse(responseText);
+              serverMessage =
+                serverData.message ||
+                serverData.detail ||
+                serverData.error ||
+                serverMessage;
+            } catch (_) {}
+
+            throw new Error(
+              serverMessage || `HTTP ${response.status}`,
+            );
           }
 
+          /*
+           * IMPORTANT:
+           * This function is also used for silent icon persistence.
+           * showAlert=true is retained for any future direct calls, while
+           * Save PNG displays its own combined PNG + JSON confirmation.
+           */
           if (showAlert) {
-            alert(`JSON saved successfully: ${reportData.date}.json`);
+            showSaveStatus(
+              "success",
+              "JSON saved successfully",
+              `${reportData.date}.json saved to daily_report_storage`,
+            );
           }
+
           return true;
         } catch (error) {
           console.error("JSON save error:", error);
+
           if (showAlert) {
-            alert("JSON could not be saved.\n\n" + error.message);
+            showSaveStatus(
+              "error",
+              "JSON could not be saved",
+              error.message || "Server save failed.",
+              7000,
+            );
           }
+
           return false;
         }
       }
@@ -3896,8 +3966,7 @@
 
             sections.forEach((section) => {
               section.items.forEach((item) => {
-                const semantic = suggestLoadedIcon(item.text || "");
-                item.icons = [semantic || "mdi:clipboard-text"];
+                if (!item.icons.length) item.icons = ["mdi:clipboard-text"];
               });
             });
           }
@@ -4077,11 +4146,22 @@
              ==================================================== */
           saveIconsForCurrentDate();
 
-          const jsonSaved = await saveReportJson(true);
+          const jsonSaved = await saveReportJson(false);
 
-          if (!jsonSaved) {
-            alert(
-              "PNG saved successfully, but the JSON data could not be saved to the server.",
+          if (jsonSaved) {
+            /* Reliable in-page confirmation: do not depend on alert(). */
+            showSaveStatus(
+              "success",
+              "PNG + JSON saved successfully",
+              `${filename} saved • ${safeDate}.json saved to daily_report_storage`,
+              6000,
+            );
+          } else {
+            showSaveStatus(
+              "error",
+              "PNG saved, but JSON save failed",
+              "The PNG is saved locally. The JSON could not be saved to the server.",
+              7000,
             );
           }
         } catch (error) {
