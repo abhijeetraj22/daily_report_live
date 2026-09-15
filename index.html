@@ -3933,6 +3933,19 @@
         if (t.includes("dispersal duty"))
           return "mdi:account-multiple-check";
 
+        /* Mid-Term Q/A paper tasks need a paper/document icon, not default clipboard. */
+        if (t.includes("bundled") &&
+            t.includes("mid-term") &&
+            t.includes("q/a") &&
+            t.includes("papers"))
+          return "mdi:package-variant-closed";
+
+        if (t.includes("distributed") &&
+            t.includes("q/a") &&
+            t.includes("mid-term") &&
+            t.includes("papers"))
+          return "mdi:file-document-multiple";
+
         if (t.includes("printed") && t.includes("question paper"))
           return "mdi:printer";
         if (t.includes("formatted") && t.includes("question paper"))
