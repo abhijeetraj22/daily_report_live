@@ -339,6 +339,14 @@ async def logout(request: Request):
 async def password_gate(request: Request, call_next):
     path = request.url.path
 
+    # ------------------------------------------------------------
+    # CORS PREFLIGHT
+    # ------------------------------------------------------------
+    # Browser sends OPTIONS before cross-origin POST requests.
+    # It must reach CORSMiddleware without authentication.
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     public_paths = {
         "/login",
         "/logout",
