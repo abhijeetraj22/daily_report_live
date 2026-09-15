@@ -496,72 +496,121 @@ async def health():
 # PARSER
 # ============================================================
 
+def _is_class_subbullet(line: str) -> bool:
+    """
+    A line such as:
+        * 5 DELTA [SANSKRIT]
+        * 8 OMICRON [SANSKRIT]
+
+    is a BULLET belonging to the previous task when that task introduces
+    a list (normally ending with ':'). It is NOT a new numbered task.
+    """
+    value = str(line or "").strip()
+    if not value.startswith("*"):
+        return False
+
+    value = value[1:].strip()
+
+    # Grade + section + [subject], e.g. 5 DELTA [SANSKRIT]
+    return bool(
+        re.fullmatch(
+            r"\d+\s+[A-Za-z0-9_-]+\s+\[[^\]]+\]",
+            value,
+        )
+    )
+
+
 def parse_report(text: str):
 
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-    ]
+    raw_lines = [line.rstrip() for line in str(text or "").splitlines()]
+
+    # Remove blank lines only for parsing. The original source text is saved
+    # separately by the frontend, so the user's source formatting is preserved.
+    lines = [line.strip() for line in raw_lines if line.strip()]
 
     sections = []
-
     current_section = None
 
     for line in lines:
 
-        if not line:
-            continue
-
         # ----------------------------------------------------
         # SECTION
         # ----------------------------------------------------
-
-        section_match = re.match(
-            r"^\*(.+?)\*$",
-            line
+        # A section is ONLY:
+        #   *EXAMINATION WORKS*
+        #
+        # **task** is NOT a section.
+        section_match = re.fullmatch(
+            r"\*(?!\*)(.+?)(?<!\*)\*",
+            line,
         )
 
         if section_match:
-
             title = section_match.group(1).strip()
 
             current_section = {
                 "title": title,
-                "items": []
+                "items": [],
             }
 
-            sections.append(
-                current_section
-            )
-
+            sections.append(current_section)
             continue
+
+        # ----------------------------------------------------
+        # BULLET SUB-POINT
+        # ----------------------------------------------------
+        #
+        # Example:
+        # * Collected notebooks from the following classes:
+        # * 5 DELTA [SANSKRIT]
+        # * 5 OMEGA [ICT]
+        #
+        # The class lines belong INSIDE the previous numbered task.
+        if (
+            current_section is not None
+            and current_section["items"]
+            and _is_class_subbullet(line)
+        ):
+            parent = current_section["items"][-1]
+
+            # Only attach class lines when the previous task introduces
+            # the list. This prevents ordinary independent tasks from
+            # accidentally becoming sub-bullets.
+            parent_text = str(parent.get("text", "")).strip()
+
+            if parent_text.endswith(":"):
+                bullet_text = line[1:].strip()
+
+                if bullet_text:
+                    parent.setdefault("bullets", []).append(bullet_text)
+
+                continue
 
         # ----------------------------------------------------
         # TASK
         # ----------------------------------------------------
-
         if line.startswith("*"):
 
-            clean = line.lstrip("*").strip()
+            if line.startswith("**") and line.endswith("**") and len(line) >= 4:
+                clean = line[2:-2].strip()
+            else:
+                clean = line[1:].strip()
 
             if not clean:
                 continue
 
             if current_section is None:
-
                 current_section = {
                     "title": "DESCRIPTION",
-                    "items": []
+                    "items": [],
                 }
-
-                sections.append(
-                    current_section
-                )
+                sections.append(current_section)
 
             current_section["items"].append(
                 {
                     "text": clean,
-                    "icons": suggest_icons(clean)
+                    "bullets": [],
+                    "icons": suggest_icons(clean),
                 }
             )
 
@@ -583,9 +632,6 @@ def suggest_icons(text: str):
     rules = [
         (("printed" , "question paper"), ["mdi:printer", "mdi:file-document-edit"]),
         (("formatted", "question paper"), ["mdi:file-document-edit", "mdi:format-align-left"]),
-        (("collected notebooks",), ["mdi:notebook-multiple", "mdi:book-multiple"]),
-        (("homework feedback", "google form"), ["mdi:form-select", "mdi:clipboard-check"]),
-        (("dispersal duty",), ["mdi:account-multiple-check", "mdi:account-group"]),
         (("q/a",), ["mdi:clipboard-text", "mdi:help-circle"]),
         (("re-arranged", "bundle"), ["mdi:package-variant-closed", "mdi:archive-outline"]),
         (("distributed", "answer-copy"), ["mdi:account-multiple", "mdi:clipboard-check"]),
@@ -606,6 +652,9 @@ def suggest_icons(text: str):
         (("verify",), ["mdi:clipboard-check", "mdi:check-decagram"]),
         (("bus",), ["mdi:bus", "mdi:bus-school"]),
         (("email",), ["mdi:email", "mdi:email-outline"]),
+        (("collected notebooks",), ["mdi:notebook-multiple", "mdi:book-multiple"]),
+        (("collected homework feedback", "google form"), ["mdi:form-select", "mdi:clipboard-check"]),
+        (("dispersal duty",), ["mdi:account-multiple-check", "mdi:account-group"]),
         (("message",), ["mdi:message-text", "mdi:message"]),
     ]
 
