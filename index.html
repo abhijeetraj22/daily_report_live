@@ -2811,6 +2811,10 @@
               const serverIcon = item.icons?.[0] || "";
               const semanticIcon = suggestLoadedIcon(item.text || "");
 
+              /*
+               * Local semantic rules are authoritative for known phrases.
+               * This prevents an old/generic server icon from overriding them.
+               */
               if (semanticIcon !== "mdi:clipboard-text") {
                 item.icons = [semanticIcon];
               }
@@ -3924,6 +3928,10 @@
           return "mdi:form-select";
         if (t.includes("collected notebooks"))
           return "mdi:notebook-multiple";
+
+        /* Dispersal Duty must NEVER fall back to the generic clipboard icon. */
+        if (t.includes("dispersal duty"))
+          return "mdi:account-multiple-check";
 
         if (t.includes("printed") && t.includes("question paper"))
           return "mdi:printer";
