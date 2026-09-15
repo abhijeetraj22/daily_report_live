@@ -2681,6 +2681,21 @@
 
           state.sections = data.sections || [];
 
+          /*
+           * IMPORTANT:
+           * The Render parser may return mdi:clipboard-text for sentences
+           * that do not have a server-side semantic rule. Never let that
+           * generic icon override the frontend semantic rules.
+           */
+          state.sections.forEach((section) => {
+            (section.items || []).forEach((item) => {
+              const serverIcon = item.icons?.[0] || "";
+              if (!serverIcon || isGenericClipboardIcon(serverIcon)) {
+                item.icons = [suggestLoadedIcon(item.text || "")];
+              }
+            });
+          });
+
           await renderRows();
         } catch (error) {
           console.error(error);
@@ -3587,6 +3602,7 @@
           date: getReportDate(),
           day: $("day").value.trim() || "",
           title: $("title").value.trim() || "DESCRIPTION",
+          source: $("source").value || "",
           rows,
         };
       }
@@ -3725,6 +3741,15 @@
           return "mdi:printer";
         if (t.includes("formatted") && t.includes("question paper"))
           return "mdi:file-document-edit";
+
+        /* Specific daily-report tasks. */
+        if (t.includes("collected notebooks"))
+          return "mdi:notebook-multiple";
+        if (t.includes("homework feedback") && t.includes("google form"))
+          return "mdi:form-select";
+        if (t.includes("dispersal duty"))
+          return "mdi:account-multiple-check";
+
         if (t.includes("q/a")) return "mdi:clipboard-text";
         if (t.includes("re-arranged") && t.includes("bundle"))
           return "mdi:package-variant-closed";
@@ -3859,7 +3884,15 @@
            * date has been loaded.  A date with no saved JSON stays blank.
            * This is intentionally based only on that date's JSON rows.
            */
-          $("source").value = sourceLines.join("\n\n");
+          /*
+           * Preserve the exact Daily Report Text for new JSON files.
+           * This prevents internal asterisks from being reformatted.
+           * Older JSON files use the reconstructed source as a fallback.
+           */
+          $("source").value =
+            typeof data.source === "string" && data.source.trim()
+              ? data.source
+              : sourceLines.join("\n\n");
 
           /* ============================================================
              REBUILD SEMANTIC ICONS FOR THE LOADED DATE
