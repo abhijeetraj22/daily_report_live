@@ -2826,6 +2826,33 @@
       }
 
       /* ============================================================
+           STABLE ICON KEY
+
+           NEVER use section/item position for icon persistence.
+           A new bullet list, inserted task, or reordered task can change
+           the numeric position and would otherwise make icons jump to
+           another sentence.
+        ============================================================ */
+
+      function makeStableIconKey(sectionTitle, text, bullets = []) {
+        const normalized = [
+          String(sectionTitle || "").trim().toLowerCase(),
+          String(text || "").trim().toLowerCase(),
+          ...(Array.isArray(bullets)
+            ? bullets.map((bullet) => String(bullet || "").trim().toLowerCase())
+            : []),
+        ].join("|");
+
+        let hash = 2166136261;
+        for (let i = 0; i < normalized.length; i++) {
+          hash ^= normalized.charCodeAt(i);
+          hash = Math.imul(hash, 16777619);
+        }
+
+        return `task:${(hash >>> 0).toString(16)}`;
+      }
+
+      /* ============================================================
            FLATTEN ITEMS
         ============================================================ */
 
@@ -2867,7 +2894,11 @@
 
               itemIndex: itemIndex,
 
-              key: `${sectionIndex}:${itemIndex}`,
+              key: makeStableIconKey(
+                section.title,
+                description,
+                item.bullets,
+              ),
             });
           });
         });
@@ -3854,7 +3885,17 @@
            * the sentence-based semantic icon when an older date is loaded.
            */
           Object.entries(savedIcons).forEach(([key, iconName]) => {
-            if (!isGenericClipboardIcon(iconName)) {
+            /*
+             * Old versions used keys such as "0:3". Those keys were tied
+             * to row position and are unsafe: after adding/removing a point,
+             * an icon can move to a different sentence.
+             *
+             * Only stable task keys are accepted now.
+             */
+            if (
+              key.startsWith("task:") &&
+              !isGenericClipboardIcon(iconName)
+            ) {
               targetOverrides[key] = iconName;
             }
           });
@@ -4015,8 +4056,12 @@
 
             /* RESTORE ONLY A REAL SAVED SELECTED ICON FROM SERVER JSON */
             if (row.icon && !isGenericClipboardIcon(row.icon)) {
-              const sectionIndex = sections.length - 1;
-              state.iconOverrides[`${sectionIndex}:${itemIndex}`] = row.icon;
+              const stableKey = makeStableIconKey(
+                currentSection.title,
+                description,
+                row.bullets,
+              );
+              state.iconOverrides[stableKey] = row.icon;
             }
           });
 
@@ -4171,8 +4216,14 @@
                      * because older JSON files used it as the default for all
                      * rows.
                      */
+                    const stableKey = makeStableIconKey(
+                      section.title,
+                      item.text,
+                      item.bullets,
+                    );
+
                     const savedIcon =
-                      state.iconOverrides[`${sectionIndex}:${itemIndex}`];
+                      state.iconOverrides[stableKey];
 
                     if (savedIcon && !isGenericClipboardIcon(savedIcon)) {
                       item.icons = [savedIcon];
