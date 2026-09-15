@@ -583,6 +583,9 @@ def suggest_icons(text: str):
     rules = [
         (("printed" , "question paper"), ["mdi:printer", "mdi:file-document-edit"]),
         (("formatted", "question paper"), ["mdi:file-document-edit", "mdi:format-align-left"]),
+        (("collected notebooks",), ["mdi:notebook-multiple", "mdi:book-multiple"]),
+        (("homework feedback", "google form"), ["mdi:form-select", "mdi:clipboard-check"]),
+        (("dispersal duty",), ["mdi:account-multiple-check", "mdi:account-group"]),
         (("q/a",), ["mdi:clipboard-text", "mdi:help-circle"]),
         (("re-arranged", "bundle"), ["mdi:package-variant-closed", "mdi:archive-outline"]),
         (("distributed", "answer-copy"), ["mdi:account-multiple", "mdi:clipboard-check"]),
@@ -634,6 +637,7 @@ class SaveReportRequest(BaseModel):
     date: str
     day: str = ""
     title: str = "DESCRIPTION"
+    source: str = ""
     rows: list = []
 
 
@@ -675,6 +679,7 @@ async def save_report_json(request: SaveReportRequest):
         "date": safe_date,
         "day": str(request.day or "").strip(),
         "title": str(request.title or "DESCRIPTION").strip(),
+        "source": str(request.source or ""),
         "rows": request.rows if isinstance(request.rows, list) else [],
     }
 
