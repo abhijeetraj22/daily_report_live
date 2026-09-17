@@ -4642,18 +4642,39 @@
               icons:
                 !isGenericClipboardIcon(row.icon) && row.icon ? [row.icon] : [],
             });
-
-            /* RESTORE ONLY A REAL SAVED SELECTED ICON FROM SERVER JSON */
-            if (row.icon && !isGenericClipboardIcon(row.icon)) {
-              const stableKey = makeStableIconKey(
-                currentSection.title,
-                description,
-                row.bullets,
-              );
+          if(row.icon && !isGenericClipboardIcon(row.icon)) {
+          
+            const stableKey = makeStableIconKey(
+              currentSection.title,
+              description,
+              row.bullets,
+            );
+          
+            /*
+             * Check the sentence first.
+             *
+             * If we have a known semantic icon, do NOT restore an old
+             * saved icon over it. This prevents old JSON files from
+             * making different sentences use the same icon.
+             */
+            const semanticIcon = suggestLoadedIcon(description);
+          
+            if (
+              semanticIcon &&
+              semanticIcon !== "mdi:clipboard-text"
+            ) {
+              /*
+               * Keep semantic icon.
+               */
+              state.iconOverrides[stableKey] = "";
+            } else {
+              /*
+               * Unknown sentence:
+               * allow the previously manually selected icon.
+               */
               state.iconOverrides[stableKey] = row.icon;
             }
-          });
-
+          }
           /*
            * Put the saved report text into the editor AFTER the previous
            * date has been loaded.  A date with no saved JSON stays blank.
