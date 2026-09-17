@@ -3102,7 +3102,7 @@
 
         $("iconSearch").focus();
 
-        searchIcons("clipboard");
+        searchIcons("");
       }
 
       /* ============================================================
@@ -3119,139 +3119,172 @@
            SEARCH ICONS
         ============================================================ */
 
-      async function searchIcons(query) {
+      /* ============================================================
+         SEARCH ICONS
+         Shows a large set of matching icons instead of only 90.
+      ============================================================ */
+      
+      async function searchIcons(query = "") {
         const grid = $("iconGrid");
-
+      
+        const searchText = String(query || "").trim();
+      
         grid.innerHTML = `
-
-                <div
-                    style="
-                        grid-column:1/-1;
-                        padding:25px;
-                        text-align:center;
-                        color:#60768b;
-                    "
-                >
-                    Searching icons...
-                </div>
-
-            `;
-
+          <div
+            style="
+              grid-column:1/-1;
+              padding:25px;
+              text-align:center;
+              color:#60768b;
+            "
+          >
+            Searching icons...
+          </div>
+        `;
+      
         try {
           const response = await fetch("/api/icons/search", {
             method: "POST",
-
+      
             headers: {
               "Content-Type": "application/json",
             },
-
+      
             body: JSON.stringify({
-              q: query || "clipboard",
-
-              limit: 90,
+              /*
+               * Empty search = broad icon collection.
+               * Typed search = matching icons.
+               */
+              q: searchText,
+      
+              /*
+               * Increase the requested result count substantially.
+               */
+              limit: 500,
             }),
           });
-
+      
+          if (!response.ok) {
+            throw new Error("Icon search failed");
+          }
+      
           const data = await response.json();
-
+      
           grid.innerHTML = "";
-
-          const icons = data.icons || [];
-
+      
+          const icons = Array.isArray(data.icons)
+            ? data.icons
+            : [];
+      
           if (!icons.length) {
             grid.innerHTML = `
-
-                        <div
-                            style="
-                                grid-column:1/-1;
-                                padding:25px;
-                                text-align:center;
-                            "
-                        >
-                            No icons found.
-                        </div>
-
-                    `;
-
+              <div
+                style="
+                  grid-column:1/-1;
+                  padding:25px;
+                  text-align:center;
+                  color:#60768b;
+                "
+              >
+                No icons found.
+              </div>
+            `;
+      
             return;
           }
-
+      
+          /*
+           * Remove duplicate icon names.
+           */
+          const uniqueIcons = [];
+          const seen = new Set();
+      
           for (const icon of icons) {
+            const name = String(icon?.name || "").trim();
+      
+            if (!name || seen.has(name)) {
+              continue;
+            }
+      
+            seen.add(name);
+            uniqueIcons.push({
+              ...icon,
+              name,
+            });
+          }
+      
+          /*
+           * Render every icon returned by the API.
+           */
+          for (const icon of uniqueIcons) {
             const button = document.createElement("button");
-
+      
             button.type = "button";
-
             button.className = "icon-option";
-
+      
             button.innerHTML = `
-
-                        <span
-                            class="picker-icon"
-                        ></span>
-
-                        <small>
-                            ${escapeHtml(icon.name)}
-                        </small>
-
-                    `;
-
+              <span class="picker-icon"></span>
+      
+              <small>
+                ${escapeHtml(icon.name)}
+              </small>
+            `;
+      
             const svg = await getIconSvg(icon.name);
-
-            const holder = button.querySelector(".picker-icon");
-
+      
+            const holder =
+              button.querySelector(".picker-icon");
+      
             if (svg) {
               holder.outerHTML = svg;
             }
-
+      
             button.addEventListener("click", async () => {
               const selectedKey = state.activeKey;
-
+      
               if (!selectedKey) {
                 return;
               }
-
-              /* Keep the selected icon in the current report state. */
-              state.iconOverrides[selectedKey] = icon.name;
-
-              closeIconPicker();
-
-              /* Save this selection under the CURRENT DATE immediately. */
-              saveIconsForCurrentDate();
-
-              /* Update the preview immediately. */
-              await renderRows();
-
+      
               /*
-               * IMPORTANT:
-               * Save the icon selection immediately.
-               * This makes the selected icon survive a browser refresh
-               * without requiring the user to press Save JSON or PNG.
+               * Save selected icon for this exact task.
                */
-              await saveReportJson(false);
+              state.iconOverrides[selectedKey] = icon.name;
+      
+              closeIconPicker();
+      
+              /*
+               * Save immediately for current date.
+               */
+              saveIconsForCurrentDate();
+      
+              /*
+               * Refresh preview.
+               */
+              await renderRows();
             });
-
+      
             grid.appendChild(button);
           }
+      
         } catch (error) {
-          console.error(error);
-
+          console.error("Icon search error:", error);
+      
           grid.innerHTML = `
-
-                    <div
-                        style="
-                            grid-column:1/-1;
-                            padding:25px;
-                            text-align:center;
-                            color:#9d4a4a;
-                        "
-                    >
-                        Icon search failed.
-                    </div>
-
-                `;
+            <div
+              style="
+                grid-column:1/-1;
+                padding:25px;
+                text-align:center;
+                color:#c62828;
+              "
+            >
+              Unable to load icons.
+              Please try again.
+            </div>
+          `;
         }
       }
-
       /* ============================================================
            PNG HELPERS
         ============================================================ */
@@ -3914,80 +3947,372 @@
            when the server parser cannot provide semantic icons.
          ============================================================ */
 
+      /* ============================================================
+         CLIENT-SIDE SEMANTIC ICON RULES
+      
+         IMPORTANT:
+         These rules reproduce the meaningful icons used in the
+         Daily Report reference image.
+      
+         Specific task phrases MUST come before generic rules.
+      ============================================================ */
+      
       function suggestLoadedIcon(text) {
         const t = String(text || "")
           .toLowerCase()
           .trim();
-
-        /* Specific task phrases MUST come before generic rules. */
-        if (t.includes("collected homework feedback") &&
-            t.includes("google form"))
-          return "mdi:form-select";
-        if (t.includes("collected notebooks"))
-          return "mdi:notebook-multiple";
-
-        /* Google Sheet status update is a spreadsheet task, NOT a bundle. */
-        if (t.includes("updated the google sheet") &&
-            t.includes("submission status"))
-          return "mdi:google-spreadsheet";
-
-        /* Dispersal Duty must NEVER fall back to the generic clipboard icon. */
-        if (t.includes("dispersal duty"))
-          return "mdi:account-multiple-check";
-
-        /* Mid-Term Q/A paper tasks need a paper/document icon, not default clipboard. */
-        if (t.includes("bundled") &&
-            t.includes("mid-term") &&
-            t.includes("q/a") &&
-            t.includes("papers"))
+      
+        /* ============================================================
+           EXACT / SPECIFIC DAILY REPORT TASKS
+        ============================================================ */
+      
+        /* 1. ARRIVAL DUTY → Home / Duty */
+        if (
+          t.includes("arrival duty") ||
+          (t.includes("arrival") && t.includes("duty"))
+        ) {
+          return "mdi:home-outline";
+        }
+      
+        /* 2. JUST QUERY → Question */
+        if (
+          t === "just query" ||
+          t.includes("just query")
+        ) {
+          return "mdi:help-circle";
+        }
+      
+        /* 3. CAMPUS OBSERVATION → Eye */
+        if (
+          t.includes("campus observation") ||
+          (t.includes("campus") && t.includes("observation"))
+        ) {
+          return "mdi:eye";
+        }
+      
+        /* 4. SUBSTITUTION → Computer / Desktop */
+        if (
+          t.includes("substitution") ||
+          t.includes("online and manual")
+        ) {
+          return "mdi:monitor";
+        }
+      
+        /* 5. DISPERSAL DUTY SHEET → Document */
+        if (
+          t.includes("dispersal duty sheet")
+        ) {
+          return "mdi:file-document";
+        }
+      
+        /* 6. TAKEN ROUNDS → Multiple People */
+        if (
+          t.includes("taken rounds") ||
+          (
+            t.includes("rounds") &&
+            (
+              t.includes("academics hour") ||
+              t.includes("lunch hour") ||
+              t.includes("dispersal")
+            )
+          )
+        ) {
+          return "mdi:account-multiple";
+        }
+      
+        /* 7. OBSERVATION REPORT + GOOGLE SHEET → Document */
+        if (
+          t.includes("observation report") &&
+          t.includes("google sheet")
+        ) {
+          return "mdi:file-document";
+        }
+      
+        /* 8. HOMEWORK FEEDBACK → Message */
+        if (
+          t.includes("homework feedback") ||
+          (
+            t.includes("feedback") &&
+            (
+              t.includes("classrooms") ||
+              t.includes("google link") ||
+              t.includes("google form")
+            )
+          )
+        ) {
+          return "mdi:message-text";
+        }
+      
+        /* 9. RC REPORT → Clipboard */
+        if (
+          t.includes("rcs report") ||
+          t.includes("rc report")
+        ) {
+          return "mdi:clipboard-text";
+        }
+      
+        /* 10. LESSON PLAN COMPLETE → Clipboard Check */
+        if (
+          t.includes("lesson plan") &&
+          (
+            t.includes("complete") ||
+            t.includes("button status")
+          )
+        ) {
+          return "mdi:clipboard-check";
+        }
+      
+        /* 11. VIVA DUTY LIST → Multiple People */
+        if (
+          t.includes("viva duty") ||
+          (
+            t.includes("viva") &&
+            t.includes("duty list")
+          )
+        ) {
+          return "mdi:account-multiple";
+        }
+      
+        /* 12. STUDENTS LIST + IDs + SECTIONS + MT EXAM → Multiple People */
+        if (
+          t.includes("students list") &&
+          (
+            t.includes("ids") ||
+            t.includes("sections")
+          ) &&
+          (
+            t.includes("mt exam") ||
+            t.includes("mid-term") ||
+            t.includes("examination")
+          )
+        ) {
+          return "mdi:account-multiple";
+        }
+      
+        /* 13. BUS DUTY → Bus */
+        if (
+          t.includes("bus duty") ||
+          t.includes("bus")
+        ) {
+          return "mdi:bus";
+        }
+      
+        /* 14. SMS / NOTICE → Email */
+        if (
+          t.includes("sms") ||
+          t.includes("notice_fun") ||
+          t.includes("notice")
+        ) {
+          return "mdi:email";
+        }
+      
+        /* ============================================================
+           EXAMINATION / PAPER TASKS
+        ============================================================ */
+      
+        if (
+          t.includes("bundled") &&
+          t.includes("mid-term") &&
+          t.includes("q/a") &&
+          t.includes("papers")
+        ) {
           return "mdi:package-variant-closed";
-
-        if (t.includes("distributed") &&
-            t.includes("q/a") &&
-            t.includes("mid-term") &&
-            t.includes("papers"))
+        }
+      
+        if (
+          t.includes("distributed") &&
+          t.includes("q/a") &&
+          t.includes("mid-term") &&
+          t.includes("papers")
+        ) {
           return "mdi:file-document-multiple";
-
-        if (t.includes("printed") && t.includes("question paper"))
+        }
+      
+        if (
+          t.includes("printed") &&
+          (
+            t.includes("question paper") ||
+            t.includes("papers") ||
+            t.includes("question")
+          )
+        ) {
           return "mdi:printer";
-        if (t.includes("formatted") && t.includes("question paper"))
-          return "mdi:file-document-edit";
-        if (t.includes("q/a")) return "mdi:clipboard-text";
-        if (t.includes("re-arranged") && t.includes("bundle"))
-          return "mdi:package-variant-closed";
-        if (t.includes("distributed") && t.includes("answer-copy"))
+        }
+      
+        if (
+          t.includes("stapled") ||
+          t.includes("stapling") ||
+          t.includes("staple")
+        ) {
+          return "mdi:paperclip";
+        }
+      
+        if (
+          t.includes("distributed") ||
+          t.includes("distribution")
+        ) {
           return "mdi:account-multiple";
-        if (t.includes("transfer certificate") && t.includes("correction"))
+        }
+      
+        if (
+          t.includes("collected") ||
+          t.includes("collection")
+        ) {
+          return "mdi:archive-arrow-down";
+        }
+      
+        if (
+          t.includes("formatted") &&
+          t.includes("question paper")
+        ) {
+          return "mdi:file-document-edit";
+        }
+      
+        /* ============================================================
+           EXISTING SPECIFIC RULES
+        ============================================================ */
+      
+        if (
+          t.includes("collected homework feedback") &&
+          t.includes("google form")
+        ) {
+          return "mdi:form-select";
+        }
+      
+        if (t.includes("collected notebooks")) {
+          return "mdi:notebook-multiple";
+        }
+      
+        if (
+          t.includes("updated the google sheet") &&
+          t.includes("submission status")
+        ) {
+          return "mdi:google-spreadsheet";
+        }
+      
+        if (t.includes("dispersal duty")) {
+          return "mdi:account-multiple-check";
+        }
+      
+        if (
+          t.includes("re-arranged") &&
+          t.includes("bundle")
+        ) {
+          return "mdi:package-variant-closed";
+        }
+      
+        if (
+          t.includes("distributed") &&
+          t.includes("answer-copy")
+        ) {
+          return "mdi:account-multiple";
+        }
+      
+        if (
+          t.includes("transfer certificate") &&
+          t.includes("correction")
+        ) {
           return "mdi:certificate";
-        if (t.includes("transfer certificate")) return "mdi:certificate";
-        if (t.includes("marksheet")) return "mdi:file-chart";
-        if (t.includes("caste certificate") && t.includes("uploaded"))
+        }
+      
+        if (t.includes("transfer certificate")) {
+          return "mdi:certificate";
+        }
+      
+        if (t.includes("marksheet")) {
+          return "mdi:file-chart";
+        }
+      
+        if (
+          t.includes("caste certificate") &&
+          t.includes("uploaded")
+        ) {
           return "mdi:cloud-upload";
-        if (t.includes("caste certificate")) return "mdi:certificate";
-        if (t.includes("migration certificate")) return "mdi:passport";
-        if (t.includes("biometric") && t.includes("attendance"))
+        }
+      
+        if (t.includes("caste certificate")) {
+          return "mdi:certificate";
+        }
+      
+        if (t.includes("migration certificate")) {
+          return "mdi:passport";
+        }
+      
+        if (
+          t.includes("biometric") &&
+          t.includes("attendance")
+        ) {
           return "mdi:fingerprint";
-        if (t.includes("attendance")) return "mdi:calendar-check";
-        if (t.includes("student")) return "mdi:account-school";
-        if (t.includes("teacher")) return "mdi:account-tie";
-        if (t.includes("principal")) return "mdi:account-tie";
-        if (t.includes("certificate")) return "mdi:certificate";
-        if (t.includes("uploaded")) return "mdi:cloud-upload";
-        if (t.includes("verified") || t.includes("verify"))
+        }
+      
+        if (t.includes("attendance")) {
+          return "mdi:calendar-check";
+        }
+      
+        if (t.includes("student")) {
+          return "mdi:account-school";
+        }
+      
+        if (t.includes("teacher")) {
+          return "mdi:account-tie";
+        }
+      
+        if (t.includes("principal")) {
+          return "mdi:account-tie";
+        }
+      
+        if (t.includes("certificate")) {
+          return "mdi:certificate";
+        }
+      
+        if (t.includes("uploaded")) {
+          return "mdi:cloud-upload";
+        }
+      
+        if (
+          t.includes("verified") ||
+          t.includes("verify")
+        ) {
           return "mdi:clipboard-check";
-        if (t.includes("bus")) return "mdi:bus";
-        if (t.includes("email")) return "mdi:email";
-        if (t.includes("message")) return "mdi:message-text";
-        if (t.includes("print")) return "mdi:printer";
-        if (t.includes("question") || t.includes("exam"))
+        }
+      
+        if (t.includes("email")) {
+          return "mdi:email";
+        }
+      
+        if (t.includes("message")) {
+          return "mdi:message-text";
+        }
+      
+        if (t.includes("print")) {
+          return "mdi:printer";
+        }
+      
+        if (
+          t.includes("question") ||
+          t.includes("exam")
+        ) {
           return "mdi:file-document-edit";
-        if (t.includes("distributed") || t.includes("given"))
-          return "mdi:account-multiple";
-        if (t.includes("bundle") || t.includes("arranged"))
+        }
+      
+        if (
+          t.includes("bundle") ||
+          t.includes("arranged")
+        ) {
           return "mdi:package-variant-closed";
-        if (t.includes("check") || t.includes("correction"))
+        }
+      
+        if (
+          t.includes("check") ||
+          t.includes("correction")
+        ) {
           return "mdi:clipboard-check";
-
+        }
+      
+        /* ============================================================
+           FINAL FALLBACK
+        ============================================================ */
+      
         return "mdi:clipboard-text";
       }
 
