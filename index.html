@@ -430,7 +430,6 @@
         margin: 0 !important;
         padding: 0 !important;
 
-        /* Never stretch the school logo. */
         object-fit: contain !important;
         object-position: left top !important;
 
@@ -3410,7 +3409,7 @@
       }
 
       /* ============================================================
-           NATIVE SVG → PNG FALLBACK
+           LEGACY SVG PNG FALLBACK — NOT USED BY SAVE PNG
         ============================================================ */
 
       async function nativePngFallback(report, filename) {
@@ -4391,104 +4390,6 @@
            SAVE REPORT AS PNG
         ============================================================ */
 
-      /* ============================================================
-           SAVE REPORT AS PNG
-
-           IMPORTANT:
-           The LIVE PREVIEW is the master.
-           PNG export captures the same fixed 1250px report DOM and
-           scales the COMPLETE report for high-resolution output.
-
-           No SVG / foreignObject fallback is used because that can
-           change image rendering, especially the school logo.
-         ============================================================ */
-
-      async function prepareExportImages(report) {
-        const images = Array.from(report.querySelectorAll("img"));
-        const backups = [];
-
-        for (const img of images) {
-          backups.push({
-            img,
-            src: img.getAttribute("src"),
-            srcset: img.getAttribute("srcset"),
-            sizes: img.getAttribute("sizes"),
-          });
-
-          img.removeAttribute("srcset");
-          img.removeAttribute("sizes");
-
-          /*
-           * Convert remote images to data URLs temporarily.
-           * This prevents cross-origin image rendering differences
-           * during PNG capture.
-           */
-          try {
-            const source = img.currentSrc || img.src;
-
-            if (source && !source.startsWith("data:")) {
-              img.src = await imageToDataUrl(source);
-            }
-          } catch (error) {
-            console.warn(
-              "Could not convert image to data URL; keeping original image.",
-              error,
-            );
-          }
-
-          img.style.display = "block";
-          img.style.visibility = "visible";
-          img.style.opacity = "1";
-        }
-
-        await Promise.all(
-          images.map(async (img) => {
-            try {
-              if (img.decode) {
-                await img.decode();
-              }
-            } catch (_) {}
-
-            if (!img.complete) {
-              await new Promise((resolve) => {
-                const done = () => {
-                  img.removeEventListener("load", done);
-                  img.removeEventListener("error", done);
-                  resolve();
-                };
-
-                img.addEventListener("load", done);
-                img.addEventListener("error", done);
-
-                setTimeout(done, 5000);
-              });
-            }
-          }),
-        );
-
-        return () => {
-          backups.forEach((backup) => {
-            if (backup.src === null) {
-              backup.img.removeAttribute("src");
-            } else {
-              backup.img.setAttribute("src", backup.src);
-            }
-
-            if (backup.srcset === null) {
-              backup.img.removeAttribute("srcset");
-            } else {
-              backup.img.setAttribute("srcset", backup.srcset);
-            }
-
-            if (backup.sizes === null) {
-              backup.img.removeAttribute("sizes");
-            } else {
-              backup.img.setAttribute("sizes", backup.sizes);
-            }
-          });
-        };
-      }
-
       async function saveReportAsPng() {
         const button = $("savePng");
 
@@ -4519,70 +4420,117 @@
         button.disabled = true;
         button.textContent = "Saving PNG…";
 
-        document.body.classList.add("png-exporting");
-
-        let restoreImages = null;
-
+        /*
+         * IMPORTANT:
+         * Do NOT change the live Preview DOM while exporting.
+         *
+         * The previous exporter temporarily changed the real image
+         * elements and also had an SVG/foreignObject fallback. Those
+         * operations can make the school logo look different from the
+         * Preview.
+         *
+         * New rule:
+         *     LIVE PREVIEW = MASTER
+         *     PNG = high-resolution capture of that same layout
+         */
         try {
           /*
-           * ----------------------------------------------------------
-           * 1. SAVE JSON FIRST
-           *
-           * A PNG rendering problem must never stop JSON from saving.
-           * ----------------------------------------------------------
+           * Save JSON independently first.
            */
           saveIconsForCurrentDate();
-
           const jsonSaved = await saveReportJson(false);
 
-          /*
-           * ----------------------------------------------------------
-           * 2. WAIT FOR THE SAME ASSETS USED BY THE PREVIEW.
-           * ----------------------------------------------------------
-           */
           await waitForReportAssets(report);
 
-          /*
-           * ----------------------------------------------------------
-           * 3. Temporarily use data URLs for report images.
-           * ----------------------------------------------------------
-           */
-          restoreImages = await prepareExportImages(report);
-
-          /*
-           * ----------------------------------------------------------
-           * 4. CAPTURE THE LIVE PREVIEW DOM.
-           *
-           * Report design = 1250px wide.
-           * Output = 4096px wide.
-           *
-           * No SVG.
-           * No foreignObject.
-           * No print CSS.
-           * No separate logo resizing.
-           * ----------------------------------------------------------
-           */
           if (typeof window.html2canvas !== "function") {
             throw new Error("html2canvas is not available.");
           }
 
-          const rect = report.getBoundingClientRect();
+          /*
+           * ----------------------------------------------------------
+           * CAPTURE GEOMETRY FROM THE LIVE PREVIEW
+           * ----------------------------------------------------------
+           */
+          const reportRect = report.getBoundingClientRect();
 
-          const width = 1250;
-
+          const width = Math.round(reportRect.width);
           const height = Math.max(
             1,
-            Math.ceil(
+            Math.round(
               Math.max(
-                rect.height,
+                reportRect.height,
                 report.scrollHeight || 0,
               ),
             ),
           );
 
+          /*
+           * The report is designed at 1250px.
+           * Keep the existing 4096px target.
+           */
           const targetWidth = 4096;
           const scale = targetWidth / width;
 
+          /*
+           * Save the exact screen geometry of the two important
+           * header images BEFORE html2canvas clones anything.
+           */
+          const logo = report.querySelector(".school-logo-image");
+          const logoRect = logo
+            ? logo.getBoundingClientRect()
+            : null;
+
+          const logoSource =
+            logo && (logo.currentSrc || logo.src)
+              ? logo.currentSrc || logo.src
+              : "";
+
+          const art = report.querySelector(".header-art-image");
+          const artRect = art
+            ? art.getBoundingClientRect()
+            : null;
+
+          const artSource =
+            art && (art.currentSrc || art.src)
+              ? art.currentSrc || art.src
+              : "";
+
+          /*
+           * Convert header images to data URLs WITHOUT modifying the
+           * live Preview.
+           */
+          let logoDataUrl = null;
+          let artDataUrl = null;
+
+          if (logoSource && !logoSource.startsWith("data:")) {
+            try {
+              logoDataUrl = await imageToDataUrl(logoSource);
+            } catch (error) {
+              console.warn("School logo data URL conversion failed:", error);
+            }
+          }
+
+          if (artSource && !artSource.startsWith("data:")) {
+            try {
+              artDataUrl = await imageToDataUrl(artSource);
+            } catch (error) {
+              console.warn("Header artwork data URL conversion failed:", error);
+            }
+          }
+
+          /*
+           * ----------------------------------------------------------
+           * HTML2CANVAS
+           *
+           * IMPORTANT:
+           * We capture the report directly. We do not:
+           *   - clone/rebuild the report ourselves
+           *   - use SVG
+           *   - use foreignObject
+           *   - apply print CSS
+           *   - resize the school logo independently
+           * ----------------------------------------------------------
+           */
           const canvas = await window.html2canvas(report, {
             scale,
 
@@ -4603,18 +4551,19 @@
             scrollX: 0,
             scrollY: 0,
 
+            /*
+             * html2canvas creates its own document clone.
+             * Only the CLONE is touched here.
+             */
             onclone: (clonedDocument) => {
               const clonedReport =
                 clonedDocument.querySelector(".report");
 
               if (!clonedReport) return;
 
-              /*
-               * EXACT SAME REPORT GEOMETRY AS PREVIEW
-               */
-              clonedReport.style.width = "1250px";
-              clonedReport.style.minWidth = "1250px";
-              clonedReport.style.maxWidth = "1250px";
+              clonedReport.style.width = `${width}px`;
+              clonedReport.style.minWidth = `${width}px`;
+              clonedReport.style.maxWidth = `${width}px`;
 
               clonedReport.style.margin = "0";
               clonedReport.style.boxShadow = "none";
@@ -4622,130 +4571,109 @@
 
               /*
                * ----------------------------------------------------
-               * SCHOOL LOGO
+               * SCHOOL LOGO — PIXEL LOCK
                *
-               * The logo keeps exactly the same box and
-               * object-fit behavior as the live preview.
+               * Use the exact screen-space width/height captured from
+               * the Preview. Do not use the mm print dimensions.
                * ----------------------------------------------------
                */
-              const logoWrapper =
-                clonedDocument.querySelector(".logo-wrapper");
+              const clonedLogo =
+                clonedDocument.querySelector(".school-logo-image");
 
-              if (logoWrapper) {
-                logoWrapper.style.position = "absolute";
-                logoWrapper.style.left = "0";
-                logoWrapper.style.top = "0";
+              if (clonedLogo && logoRect) {
+                clonedLogo.style.display = "block";
+                clonedLogo.style.visibility = "visible";
+                clonedLogo.style.opacity = "1";
 
-                logoWrapper.style.width = "171px";
-                logoWrapper.style.height = "141px";
+                clonedLogo.style.width =
+                  `${Math.round(logoRect.width)}px`;
 
-                logoWrapper.style.minWidth = "171px";
-                logoWrapper.style.minHeight = "141px";
+                clonedLogo.style.height =
+                  `${Math.round(logoRect.height)}px`;
 
-                logoWrapper.style.maxWidth = "171px";
-                logoWrapper.style.maxHeight = "141px";
+                clonedLogo.style.minWidth =
+                  `${Math.round(logoRect.width)}px`;
 
-                logoWrapper.style.display = "flex";
-                logoWrapper.style.alignItems = "flex-start";
-                logoWrapper.style.justifyContent = "flex-start";
+                clonedLogo.style.minHeight =
+                  `${Math.round(logoRect.height)}px`;
 
-                logoWrapper.style.overflow = "visible";
-                logoWrapper.style.visibility = "visible";
-                logoWrapper.style.opacity = "1";
-              }
+                clonedLogo.style.maxWidth =
+                  `${Math.round(logoRect.width)}px`;
 
-              const logo =
-                clonedDocument.querySelector(
-                  ".school-logo-image",
-                );
+                clonedLogo.style.maxHeight =
+                  `${Math.round(logoRect.height)}px`;
 
-              if (logo) {
-                logo.style.display = "block";
+                clonedLogo.style.objectFit = "contain";
+                clonedLogo.style.objectPosition = "left top";
 
-                logo.style.width = "171px";
-                logo.style.height = "141px";
+                clonedLogo.style.margin = "0";
+                clonedLogo.style.padding = "0";
 
-                logo.style.minWidth = "171px";
-                logo.style.minHeight = "141px";
+                clonedLogo.removeAttribute("srcset");
+                clonedLogo.removeAttribute("sizes");
 
-                logo.style.maxWidth = "171px";
-                logo.style.maxHeight = "141px";
-
-                logo.style.margin = "0";
-                logo.style.padding = "0";
-
-                logo.style.objectFit = "contain";
-                logo.style.objectPosition = "left top";
-
-                logo.style.flex = "0 0 171px";
-
-                logo.style.visibility = "visible";
-                logo.style.opacity = "1";
-
-                logo.removeAttribute("srcset");
-                logo.removeAttribute("sizes");
+                if (logoDataUrl) {
+                  clonedLogo.src = logoDataUrl;
+                }
               }
 
               /*
                * ----------------------------------------------------
-               * TOP-RIGHT ART
+               * TOP-RIGHT ART — PIXEL LOCK
                * ----------------------------------------------------
                */
-              const artWrapper =
-                clonedDocument.querySelector(".header-art");
+              const clonedArt =
+                clonedDocument.querySelector(".header-art-image");
 
-              if (artWrapper) {
-                artWrapper.style.position = "absolute";
-                artWrapper.style.right = "0";
-                artWrapper.style.top = "0";
+              if (clonedArt && artRect) {
+                clonedArt.style.display = "block";
+                clonedArt.style.visibility = "visible";
+                clonedArt.style.opacity = "1";
 
-                artWrapper.style.width = "177px";
-                artWrapper.style.height = "145px";
+                clonedArt.style.width =
+                  `${Math.round(artRect.width)}px`;
 
-                artWrapper.style.minWidth = "177px";
-                artWrapper.style.minHeight = "145px";
+                clonedArt.style.height =
+                  `${Math.round(artRect.height)}px`;
 
-                artWrapper.style.maxWidth = "177px";
-                artWrapper.style.maxHeight = "145px";
+                clonedArt.style.minWidth =
+                  `${Math.round(artRect.width)}px`;
 
-                artWrapper.style.display = "flex";
-                artWrapper.style.alignItems = "flex-start";
-                artWrapper.style.justifyContent = "flex-end";
+                clonedArt.style.minHeight =
+                  `${Math.round(artRect.height)}px`;
 
-                artWrapper.style.overflow = "visible";
-                artWrapper.style.visibility = "visible";
-                artWrapper.style.opacity = "1";
+                clonedArt.style.maxWidth =
+                  `${Math.round(artRect.width)}px`;
+
+                clonedArt.style.maxHeight =
+                  `${Math.round(artRect.height)}px`;
+
+                clonedArt.style.objectFit = "contain";
+                clonedArt.style.objectPosition = "right top";
+
+                clonedArt.style.margin = "0";
+                clonedArt.style.padding = "0";
+
+                clonedArt.removeAttribute("srcset");
+                clonedArt.removeAttribute("sizes");
+
+                if (artDataUrl) {
+                  clonedArt.src = artDataUrl;
+                }
               }
 
-              const art =
-                clonedDocument.querySelector(
-                  ".header-art-image",
-                );
-
-              if (art) {
-                art.style.display = "block";
-
-                art.style.width = "177px";
-                art.style.height = "145px";
-
-                art.style.minWidth = "177px";
-                art.style.minHeight = "145px";
-
-                art.style.maxWidth = "177px";
-                art.style.maxHeight = "145px";
-
-                art.style.margin = "0";
-                art.style.padding = "0";
-
-                art.style.objectFit = "contain";
-                art.style.objectPosition = "right top";
-
-                art.style.visibility = "visible";
-                art.style.opacity = "1";
-
-                art.removeAttribute("srcset");
-                art.removeAttribute("sizes");
-              }
+              /*
+               * Make all report images visible, but do not alter their
+               * dimensions or layout.
+               */
+              clonedReport
+                .querySelectorAll("img")
+                .forEach((img) => {
+                  img.style.visibility = "visible";
+                  img.style.opacity = "1";
+                  img.removeAttribute("srcset");
+                  img.removeAttribute("sizes");
+                });
             },
           });
 
@@ -4759,13 +4687,136 @@
             );
           }
 
+          /*
+           * ----------------------------------------------------------
+           * FINAL LOGO PIXEL CORRECTION
+           *
+           * html2canvas normally renders the logo correctly. If the
+           * browser's image decoder gives a slightly different result,
+           * redraw only the logo using the SAME source image and the
+           * EXACT Preview rectangle.
+           *
+           * This does NOT stretch the logo.
+           * It performs the same CSS "contain" calculation.
+           * ----------------------------------------------------------
+           */
+          if (logo && logoRect && logoSource) {
+            try {
+              const image = new Image();
+
+              image.decoding = "async";
+              image.crossOrigin = "anonymous";
+
+              image.src = logoDataUrl || logoSource;
+
+              await new Promise((resolve, reject) => {
+                if (image.complete && image.naturalWidth > 0) {
+                  resolve();
+                  return;
+                }
+
+                image.onload = resolve;
+                image.onerror = reject;
+
+                setTimeout(
+                  () => reject(
+                    new Error("School logo could not be decoded.")
+                  ),
+                  10000,
+                );
+              });
+
+              /*
+               * Coordinates relative to the report.
+               */
+              const x =
+                (logoRect.left - reportRect.left) * scale;
+
+              const y =
+                (logoRect.top - reportRect.top) * scale;
+
+              const boxWidth =
+                logoRect.width * scale;
+
+              const boxHeight =
+                logoRect.height * scale;
+
+              /*
+               * CSS object-fit: contain calculation.
+               */
+              const imageRatio =
+                image.naturalWidth / image.naturalHeight;
+
+              const boxRatio =
+                boxWidth / boxHeight;
+
+              let drawWidth;
+              let drawHeight;
+
+              if (imageRatio > boxRatio) {
+                drawWidth = boxWidth;
+                drawHeight = boxWidth / imageRatio;
+              } else {
+                drawHeight = boxHeight;
+                drawWidth = boxHeight * imageRatio;
+              }
+
+              /*
+               * object-position: left top
+               */
+              const drawX = x;
+              const drawY = y;
+
+              const ctx = canvas.getContext("2d");
+
+              if (!ctx) {
+                throw new Error("Canvas 2D context unavailable.");
+              }
+
+              /*
+               * Clear only the logo's exact rectangle, then redraw
+               * the logo with preserved aspect ratio.
+               *
+               * The report background in this area is white.
+               */
+              ctx.save();
+
+              ctx.fillStyle = "#fffef9";
+              ctx.fillRect(
+                x,
+                y,
+                boxWidth,
+                boxHeight,
+              );
+
+              ctx.drawImage(
+                image,
+                0,
+                0,
+                image.naturalWidth,
+                image.naturalHeight,
+                drawX,
+                drawY,
+                drawWidth,
+                drawHeight,
+              );
+
+              ctx.restore();
+            } catch (logoError) {
+              console.warn(
+                "Final school-logo pixel correction skipped:",
+                logoError,
+              );
+            }
+          }
+
           await downloadCanvasPng(canvas, filename);
 
           if (jsonSaved) {
             showSaveStatus(
               "success",
               "PNG + JSON saved successfully",
-              `${filename} saved at 4096px wide • ${safeDate}.json saved`,
+              `${filename} saved at ${Math.round(width * scale)}px wide • JSON saved`,
               6000,
             );
           } else {
@@ -4786,17 +4837,10 @@
             7000,
           );
         } finally {
-          try {
-            if (typeof restoreImages === "function") {
-              restoreImages();
-            }
-          } catch (restoreError) {
-            console.warn(
-              "Could not restore preview images:",
-              restoreError,
-            );
-          }
-
+          /*
+           * No Preview image was modified, so there is nothing to
+           * restore here.
+           */
           document.body.classList.remove("png-exporting");
 
           button.disabled = false;
