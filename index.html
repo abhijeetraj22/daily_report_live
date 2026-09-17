@@ -2911,37 +2911,59 @@
         ============================================================ */
 
       async function getIconSvg(iconName) {
-        if (state.iconCache[iconName]) {
-          return state.iconCache[iconName];
+        const name = String(iconName || "").trim();
+      
+        if (!name) return "";
+      
+        if (state.iconCache[name]) {
+          return state.iconCache[name];
         }
-
+      
         try {
           const response = await fetch("/api/icons/svg", {
             method: "POST",
-
+      
             headers: {
               "Content-Type": "application/json",
             },
-
+      
             body: JSON.stringify({
-              name: iconName,
+              name: name,
             }),
           });
-
+      
+          if (!response.ok) {
+            console.warn(
+              "SVG API returned:",
+              response.status,
+              name
+            );
+      
+            return "";
+          }
+      
           const data = await response.json();
-
-          if (data.svg) {
-            state.iconCache[iconName] = data.svg;
-
+      
+          if (
+            data &&
+            typeof data.svg === "string" &&
+            data.svg.trim()
+          ) {
+            state.iconCache[name] = data.svg;
+      
             return data.svg;
           }
+      
         } catch (error) {
-          console.error("Icon SVG error:", error);
+          console.error(
+            "Icon SVG error:",
+            name,
+            error
+          );
         }
-
+      
         return "";
       }
-
       /* ============================================================
            RENDER ROWS
         ============================================================ */
@@ -3119,11 +3141,6 @@
            SEARCH ICONS
         ============================================================ */
 
-      /* ============================================================
-         SEARCH ICONS
-         Shows a large set of matching icons instead of only 90.
-      ============================================================ */
-      
       async function searchIcons(query = "") {
         const grid = $("iconGrid");
       
@@ -3151,15 +3168,7 @@
             },
       
             body: JSON.stringify({
-              /*
-               * Empty search = broad icon collection.
-               * Typed search = matching icons.
-               */
               q: searchText,
-      
-              /*
-               * Increase the requested result count substantially.
-               */
               limit: 500,
             }),
           });
@@ -3170,11 +3179,11 @@
       
           const data = await response.json();
       
-          grid.innerHTML = "";
-      
           const icons = Array.isArray(data.icons)
             ? data.icons
             : [];
+      
+          grid.innerHTML = "";
       
           if (!icons.length) {
             grid.innerHTML = `
@@ -3193,20 +3202,17 @@
             return;
           }
       
-          /*
-           * Remove duplicate icon names.
-           */
+          /* Remove duplicate icon names */
           const uniqueIcons = [];
           const seen = new Set();
       
           for (const icon of icons) {
             const name = String(icon?.name || "").trim();
       
-            if (!name || seen.has(name)) {
-              continue;
-            }
+            if (!name || seen.has(name)) continue;
       
             seen.add(name);
+      
             uniqueIcons.push({
               ...icon,
               name,
@@ -3214,8 +3220,11 @@
           }
       
           /*
-           * Render every icon returned by the API.
+           * Create ALL icon cards first.
+           * This prevents the UI from waiting for each SVG.
            */
+          const buttons = [];
+      
           for (const icon of uniqueIcons) {
             const button = document.createElement("button");
       
@@ -3223,49 +3232,120 @@
             button.className = "icon-option";
       
             button.innerHTML = `
-              <span class="picker-icon"></span>
+              <span class="picker-icon">
+                <span class="picker-icon-loading">⌛</span>
+              </span>
       
               <small>
                 ${escapeHtml(icon.name)}
               </small>
             `;
       
-            const svg = await getIconSvg(icon.name);
+            grid.appendChild(button);
       
-            const holder =
-              button.querySelector(".picker-icon");
+            buttons.push({
+              button,
+              icon,
+            });
       
-            if (svg) {
-              holder.outerHTML = svg;
-            }
-      
+            /* Selection */
             button.addEventListener("click", async () => {
               const selectedKey = state.activeKey;
       
-              if (!selectedKey) {
-                return;
-              }
+              if (!selectedKey) return;
       
-              /*
-               * Save selected icon for this exact task.
-               */
               state.iconOverrides[selectedKey] = icon.name;
       
               closeIconPicker();
       
-              /*
-               * Save immediately for current date.
-               */
               saveIconsForCurrentDate();
       
-              /*
-               * Refresh preview.
-               */
               await renderRows();
-            });
       
-            grid.appendChild(button);
+              await saveReportJson(false);
+            });
           }
+      
+          /*
+           * Load SVG previews independently.
+           * One failed icon must NOT prevent other icons from displaying.
+           */
+          await Promise.all(
+            buttons.map(async ({ button, icon }) => {
+              try {
+                const svg = await getIconSvg(icon.name);
+      
+                if (!button.isConnected) return;
+      
+                const holder =
+                  button.querySelector(".picker-icon");
+      
+                if (!holder) return;
+      
+                if (svg) {
+                  holder.innerHTML = svg;
+      
+                  /*
+                   * Force the SVG to be visible inside the picker.
+                   */
+                  const svgElement =
+                    holder.querySelector("svg");
+      
+                  if (svgElement) {
+                    svgElement.setAttribute("width", "42");
+                    svgElement.setAttribute("height", "42");
+      
+                    svgElement.style.width = "42px";
+                    svgElement.style.height = "42px";
+                    svgElement.style.display = "block";
+                    svgElement.style.visibility = "visible";
+                    svgElement.style.opacity = "1";
+                  }
+      
+                } else {
+                  /*
+                   * SVG failed — show a clear fallback,
+                   * but NEVER remove the icon card.
+                   */
+                  holder.innerHTML = `
+                    <span
+                      style="
+                        font-size:30px;
+                        line-height:1;
+                        color:#60768b;
+                      "
+                    >
+                      ◇
+                    </span>
+                  `;
+                }
+      
+              } catch (error) {
+                console.warn(
+                  "Could not load icon:",
+                  icon.name,
+                  error
+                );
+      
+                const holder =
+                  button.querySelector(".picker-icon");
+      
+                if (holder) {
+                  holder.innerHTML = `
+                    <span
+                      style="
+                        font-size:30px;
+                        line-height:1;
+                        color:#60768b;
+                      "
+                    >
+                      ◇
+                    </span>
+                  `;
+                }
+              }
+            })
+          );
       
         } catch (error) {
           console.error("Icon search error:", error);
@@ -3276,11 +3356,10 @@
                 grid-column:1/-1;
                 padding:25px;
                 text-align:center;
-                color:#c62828;
+                color:#9d4a4a;
               "
             >
-              Unable to load icons.
-              Please try again.
+              Icon search failed.
             </div>
           `;
         }
@@ -4105,7 +4184,26 @@
         ) {
           return "mdi:email";
         }
-      
+      /* PRINTED SUPERVISION TEACHER ARRIVAL SHEET */
+        if (
+          t.includes("printed") &&
+          t.includes("supervision") &&
+          t.includes("teacher") &&
+          t.includes("arrival") &&
+          t.includes("sheet")
+        ) {
+          return "mdi:printer";
+        }
+        
+        /* GIVEN MID TERM ANSWER BUNDLE TO TEACHER */
+        if (
+          t.includes("given") &&
+          t.includes("mid term") &&
+          t.includes("answer bundle") &&
+          t.includes("teacher")
+        ) {
+          return "mdi:account-multiple";
+        }
         /* ============================================================
            EXAMINATION / PAPER TASKS
         ============================================================ */
