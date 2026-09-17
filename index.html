@@ -3964,7 +3964,7 @@
           localStorage.setItem(
             getIconStorageKey(getReportDate()),
             JSON.stringify({
-              version: 2,
+              version: 3,
               icons: state.iconOverrides || {},
             }),
           );
@@ -3989,7 +3989,7 @@
           if (
             !savedData ||
             typeof savedData !== "object" ||
-            savedData.version !== 2 ||
+            savedData.version !== 3 ||
             !savedData.icons ||
             typeof savedData.icons !== "object"
           ) {
@@ -4071,7 +4071,7 @@
           (t.includes("verified") || t.includes("verify")) &&
           t.includes("transfer certificate")
         ) {
-          return "mdi:certificate-check";
+          return "mdi:check";
         }
         
         
