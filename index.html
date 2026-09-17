@@ -4091,6 +4091,18 @@
         
         
         /* ------------------------------------------------------------
+           FLOOR DUTY DURING EXAMINATION → Duty / Supervision
+           This must run before the generic "exam" rule below.
+        ------------------------------------------------------------ */
+        if (
+          t.includes("floor duty") ||
+          (t.includes("floor") && t.includes("duty"))
+        ) {
+          return "mdi:shield-account";
+        }
+        
+        
+        /* ------------------------------------------------------------
            PRINTED QUESTION PAPER
         ------------------------------------------------------------ */
         if (
