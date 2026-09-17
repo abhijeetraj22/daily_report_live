@@ -3004,10 +3004,7 @@
                    ICON
                 ---------------------------------------------------- */
 
-          const semanticIcon =
-            (item.icons && item.icons[0]) || "mdi:clipboard-text";
-
-          const iconName = state.iconOverrides[item.key] || semanticIcon;
+          const iconName = getEffectiveIcon(item);
 
           /* ----------------------------------------------------
                    ROW
@@ -3875,10 +3872,7 @@
             bullets: Array.isArray(item.bullets)
               ? item.bullets.map((bullet) => String(bullet || "").trim()).filter(Boolean)
               : [],
-            icon:
-              state.iconOverrides[item.key] ||
-              (item.icons && item.icons[0]) ||
-              "mdi:clipboard-text",
+            icon: getEffectiveIcon(item),
           });
         });
 
@@ -3969,7 +3963,10 @@
         try {
           localStorage.setItem(
             getIconStorageKey(getReportDate()),
-            JSON.stringify(state.iconOverrides || {}),
+            JSON.stringify({
+              version: 2,
+              icons: state.iconOverrides || {},
+            }),
           );
         } catch (error) {
           console.warn("Could not save date-specific icons locally:", error);
@@ -3988,8 +3985,18 @@
           const raw = localStorage.getItem(getIconStorageKey(date));
           if (!raw) return;
 
-          const savedIcons = JSON.parse(raw);
-          if (!savedIcons || typeof savedIcons !== "object") return;
+          const savedData = JSON.parse(raw);
+          if (
+            !savedData ||
+            typeof savedData !== "object" ||
+            savedData.version !== 2 ||
+            !savedData.icons ||
+            typeof savedData.icons !== "object"
+          ) {
+            return;
+          }
+
+          const savedIcons = savedData.icons;
 
           /*
            * IMPORTANT:
@@ -4434,13 +4441,6 @@
           return "mdi:account-multiple";
         }
       
-        if (
-          t.includes("transfer certificate") &&
-          t.includes("correction")
-        ) {
-          return "mdi:certificate";
-        }
-      
         if (t.includes("transfer certificate")) {
           return "mdi:certificate";
         }
@@ -4541,7 +4541,40 @@
       
         return "mdi:clipboard-text";
       }
+      /* ============================================================
+         FINAL EFFECTIVE ICON
+         ------------------------------------------------------------
+         Specific semantic rules have priority for certificate tasks.
+         This prevents old saved JSON/localStorage icons from causing
+         the same icon to appear on different certificate sentences.
+      ============================================================ */
+      
+      function getEffectiveIcon(item) {
+        const text = String(item?.text || "").trim();
 
+        /* User-selected icon always wins. */
+        const manualIcon = state.iconOverrides[item.key];
+        if (manualIcon && !isGenericClipboardIcon(manualIcon)) {
+          return manualIcon;
+        }
+
+        /* Current sentence-based semantic icon. */
+        const semanticIcon = suggestLoadedIcon(text);
+        if (semanticIcon && !isGenericClipboardIcon(semanticIcon)) {
+          return semanticIcon;
+        }
+
+        /* Server/parser icon as fallback. */
+        if (
+          item.icons &&
+          item.icons[0] &&
+          !isGenericClipboardIcon(item.icons[0])
+        ) {
+          return item.icons[0];
+        }
+
+        return "mdi:clipboard-text";
+      }
       async function loadReportJson(date, loadVersion = dateLoadVersion) {
         const safeDate = String(date || "").trim();
         if (!safeDate) return false;
@@ -4642,39 +4675,7 @@
               icons:
                 !isGenericClipboardIcon(row.icon) && row.icon ? [row.icon] : [],
             });
-          if(row.icon && !isGenericClipboardIcon(row.icon)) {
-          
-            const stableKey = makeStableIconKey(
-              currentSection.title,
-              description,
-              row.bullets,
-            );
-          
-            /*
-             * Check the sentence first.
-             *
-             * If we have a known semantic icon, do NOT restore an old
-             * saved icon over it. This prevents old JSON files from
-             * making different sentences use the same icon.
-             */
-            const semanticIcon = suggestLoadedIcon(description);
-          
-            if (
-              semanticIcon &&
-              semanticIcon !== "mdi:clipboard-text"
-            ) {
-              /*
-               * Keep semantic icon.
-               */
-              state.iconOverrides[stableKey] = "";
-            } else {
-              /*
-               * Unknown sentence:
-               * allow the previously manually selected icon.
-               */
-              state.iconOverrides[stableKey] = row.icon;
-            }
-          }
+          });
           /*
            * Put the saved report text into the editor AFTER the previous
            * date has been loaded.  A date with no saved JSON stays blank.
@@ -4752,19 +4753,6 @@
                   ? sourceData.sections
                   : [];
 
-                const savedIconByText = new Map();
-
-                rows.forEach((row) => {
-                  if (row.type !== "data") return;
-                  const cells = Array.isArray(row.cells) ? row.cells : [];
-                  const text = String(cells[1] || "").trim();
-                  const icon = String(row.icon || "").trim();
-
-                  if (text && icon && !isGenericClipboardIcon(icon)) {
-                    savedIconByText.set(text, icon);
-                  }
-                });
-
                 parsedSections.forEach((section) => {
                   (section.items || []).forEach((item) => {
                     item.bullets = Array.isArray(item.bullets)
@@ -4776,13 +4764,10 @@
                 parsedSections.forEach((section) => {
                   (section.items || []).forEach((item) => {
                     const text = String(item.text || "").trim();
-                    const savedIcon = savedIconByText.get(text);
                     item.bullets = Array.isArray(item.bullets)
                       ? item.bullets.map((bullet) => String(bullet || "").trim()).filter(Boolean)
                       : [];
-                    item.icons = [
-                      savedIcon || suggestLoadedIcon(text),
-                    ];
+                    item.icons = [suggestLoadedIcon(text)];
                   });
                 });
 
@@ -4864,34 +4849,20 @@
                      * because older JSON files used it as the default for all
                      * rows.
                      */
-                    const stableKey = makeStableIconKey(
-                      section.title,
-                      item.text,
-                      item.bullets,
-                    );
-
-                    const savedIcon =
-                      state.iconOverrides[stableKey];
-
-                    if (savedIcon && !isGenericClipboardIcon(savedIcon)) {
-                      item.icons = [savedIcon];
-                      return;
-                    }
-
-                    const semanticIcon = semanticItems[itemIndex]?.icons?.[0];
                     const fallbackIcon = suggestLoadedIcon(item.text || "");
-
-                    /*
-                     * If the deployed parser returns the generic clipboard
-                     * icon, use the local semantic rules for this loaded
-                     * previous-date report instead.
-                     */
+                    const serverSemanticIcon =
+                      semanticItems[itemIndex]?.icons?.[0] || "";
                     const usableServerIcon =
-                      semanticIcon && semanticIcon !== "mdi:clipboard-text"
-                        ? semanticIcon
+                      serverSemanticIcon &&
+                      serverSemanticIcon !== "mdi:clipboard-text"
+                        ? serverSemanticIcon
                         : "";
 
-                    item.icons = [usableServerIcon || fallbackIcon];
+                    item.icons = [
+                      fallbackIcon !== "mdi:clipboard-text"
+                        ? fallbackIcon
+                        : usableServerIcon || "mdi:clipboard-text"
+                    ];
                   });
                 });
               } else {
