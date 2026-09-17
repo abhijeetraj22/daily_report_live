@@ -4352,6 +4352,17 @@
           return "mdi:account-multiple";
         }
         /* ============================================================
+           FLOOR DUTY — DUTY / SUPERVISION ICON
+           Must come before generic "exam"/"question" rules.
+        ============================================================ */
+        if (
+          t.includes("floor duty") ||
+          (t.includes("floor") && t.includes("duty"))
+        ) {
+          return "mdi:shield-account";
+        }
+
+        /* ============================================================
            EXAMINATION / PAPER TASKS
         ============================================================ */
       
