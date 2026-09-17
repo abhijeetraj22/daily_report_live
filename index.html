@@ -416,27 +416,28 @@
       }
 
       .school-logo-image {
-          display: block !important;
-      
-          width: 171px !important;
-          height: 141px !important;
-      
-          min-width: 171px !important;
-          min-height: 141px !important;
-      
-          max-width: 171px !important;
-          max-height: 141px !important;
-      
-          margin: 0 !important;
-          padding: 0 !important;
-      
-          object-fit: contain !important;
-          object-position: left top !important;
-      
-          visibility: visible !important;
-          opacity: 1 !important;
-      
-          flex: 0 0 171px !important;
+        display: block !important;
+
+        width: 171px !important;
+        height: 141px !important;
+
+        min-width: 171px !important;
+        min-height: 141px !important;
+
+        max-width: 171px !important;
+        max-height: 141px !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
+        /* Never stretch the school logo. */
+        object-fit: contain !important;
+        object-position: left top !important;
+
+        flex: 0 0 171px !important;
+
+        visibility: visible !important;
+        opacity: 1 !important;
       }
 
       /* ============================================================
@@ -4390,237 +4391,417 @@
            SAVE REPORT AS PNG
         ============================================================ */
 
-      async function saveReportAsPng() {
-          const button = $("savePng");
-      
-          if (!button) return;
-      
-          updateHeader();
-      
-          const report = document.querySelector(".report");
-      
-          if (!report) {
-              alert("Report preview is not available.");
-              return;
-          }
-      
-          const safeDate = (getReportDate() || getTodayDate()).replace(
-              /[^0-9A-Za-z_-]+/g,
-              "-"
-          );
-      
-          const filename = `Daily_Report_${safeDate}.png`;
-      
-          const originalText = button.textContent;
-      
-          button.disabled = true;
-          button.textContent = "Saving PNG…";
-      
-          document.body.classList.add("png-exporting");
-      
+      /* ============================================================
+           SAVE REPORT AS PNG
+
+           IMPORTANT:
+           The LIVE PREVIEW is the master.
+           PNG export captures the same fixed 1250px report DOM and
+           scales the COMPLETE report for high-resolution output.
+
+           No SVG / foreignObject fallback is used because that can
+           change image rendering, especially the school logo.
+         ============================================================ */
+
+      async function prepareExportImages(report) {
+        const images = Array.from(report.querySelectorAll("img"));
+        const backups = [];
+
+        for (const img of images) {
+          backups.push({
+            img,
+            src: img.getAttribute("src"),
+            srcset: img.getAttribute("srcset"),
+            sizes: img.getAttribute("sizes"),
+          });
+
+          img.removeAttribute("srcset");
+          img.removeAttribute("sizes");
+
+          /*
+           * Convert remote images to data URLs temporarily.
+           * This prevents cross-origin image rendering differences
+           * during PNG capture.
+           */
           try {
-              await waitForReportAssets(report);
-      
-              if (typeof window.html2canvas !== "function") {
-                  throw new Error("html2canvas is not available.");
-              }
-      
-              /*
-               * IMPORTANT
-               * Capture the report exactly as displayed.
-               * Do NOT rebuild it through SVG/foreignObject.
-               */
-              const reportWidth = 1250;
-      
-              const reportHeight = Math.ceil(
-                  report.getBoundingClientRect().height
-              );
-      
-              /*
-               * 4096px output width.
-               */
-              const scale = 4096 / reportWidth;
-      
-              const canvas = await window.html2canvas(report, {
-                  scale: scale,
-      
-                  width: reportWidth,
-                  height: reportHeight,
-      
-                  backgroundColor: "#fffef9",
-      
-                  useCORS: true,
-                  allowTaint: false,
-      
-                  imageTimeout: 20000,
-      
-                  logging: false,
-      
-                  scrollX: 0,
-                  scrollY: 0,
-      
-                  onclone: (clonedDocument) => {
-      
-                      const clonedReport =
-                          clonedDocument.querySelector(".report");
-      
-                      if (!clonedReport) return;
-      
-                      /*
-                       * KEEP EXACT REPORT GEOMETRY
-                       */
-                      clonedReport.style.width = "1250px";
-                      clonedReport.style.minWidth = "1250px";
-                      clonedReport.style.maxWidth = "1250px";
-      
-                      clonedReport.style.margin = "0";
-                      clonedReport.style.boxShadow = "none";
-                      clonedReport.style.overflow = "visible";
-      
-                      /*
-                       * KEEP SCHOOL LOGO EXACTLY LIKE PREVIEW
-                       */
-                      const logo =
-                          clonedDocument.querySelector(
-                              ".school-logo-image"
-                          );
-      
-                      if (logo) {
-                          logo.style.display = "block";
-                          logo.style.width = "171px";
-                          logo.style.height = "141px";
-      
-                          logo.style.minWidth = "171px";
-                          logo.style.minHeight = "141px";
-      
-                          logo.style.maxWidth = "171px";
-                          logo.style.maxHeight = "141px";
-      
-                          logo.style.objectFit = "contain";
-                          logo.style.objectPosition = "left top";
-      
-                          logo.style.margin = "0";
-                          logo.style.padding = "0";
-      
-                          logo.style.visibility = "visible";
-                          logo.style.opacity = "1";
-      
-                          logo.removeAttribute("srcset");
-                      }
-      
-                      /*
-                       * KEEP TOP-RIGHT ART EXACTLY LIKE PREVIEW
-                       */
-                      const art =
-                          clonedDocument.querySelector(
-                              ".header-art-image"
-                          );
-      
-                      if (art) {
-                          art.style.display = "block";
-                          art.style.width = "177px";
-                          art.style.height = "145px";
-      
-                          art.style.minWidth = "177px";
-                          art.style.minHeight = "145px";
-      
-                          art.style.maxWidth = "177px";
-                          art.style.maxHeight = "145px";
-      
-                          art.style.objectFit = "contain";
-                          art.style.objectPosition = "right top";
-      
-                          art.style.margin = "0";
-                          art.style.padding = "0";
-      
-                          art.style.visibility = "visible";
-                          art.style.opacity = "1";
-      
-                          art.removeAttribute("srcset");
-                      }
-      
-                      /*
-                       * Keep logo and artwork containers unchanged.
-                       */
-                      const logoWrapper =
-                          clonedDocument.querySelector(
-                              ".logo-wrapper"
-                          );
-      
-                      if (logoWrapper) {
-                          logoWrapper.style.display = "flex";
-                          logoWrapper.style.width = "171px";
-                          logoWrapper.style.height = "141px";
-                          logoWrapper.style.left = "0";
-                          logoWrapper.style.top = "0";
-                          logoWrapper.style.visibility = "visible";
-                          logoWrapper.style.opacity = "1";
-                      }
-      
-                      const artWrapper =
-                          clonedDocument.querySelector(
-                              ".header-art"
-                          );
-      
-                      if (artWrapper) {
-                          artWrapper.style.display = "flex";
-                          artWrapper.style.width = "177px";
-                          artWrapper.style.height = "145px";
-                          artWrapper.style.right = "0";
-                          artWrapper.style.top = "0";
-                          artWrapper.style.visibility = "visible";
-                          artWrapper.style.opacity = "1";
-                      }
-                  }
-              });
-      
-              if (!canvas || canvas.width < 2000) {
-                  throw new Error("Invalid PNG canvas generated.");
-              }
-      
-              await downloadCanvasPng(canvas, filename);
-      
-              /*
-               * Save JSON separately.
-               */
-              saveIconsForCurrentDate();
-      
-              const jsonSaved = await saveReportJson(false);
-      
-              if (jsonSaved) {
-                  showSaveStatus(
-                      "success",
-                      "PNG + JSON saved successfully",
-                      `${filename} saved • ${safeDate}.json saved`,
-                      6000
-                  );
-              } else {
-                  showSaveStatus(
-                      "error",
-                      "PNG saved, but JSON save failed",
-                      "The PNG was saved locally, but JSON could not be saved.",
-                      7000
-                  );
-              }
-      
+            const source = img.currentSrc || img.src;
+
+            if (source && !source.startsWith("data:")) {
+              img.src = await imageToDataUrl(source);
+            }
           } catch (error) {
-      
-              console.error("PNG export error:", error);
-      
-              showSaveStatus(
-                  "error",
-                  "PNG could not be saved",
-                  error.message || "PNG export failed.",
-                  7000
-              );
-      
-          } finally {
-      
-              document.body.classList.remove("png-exporting");
-      
-              button.disabled = false;
-              button.textContent = originalText;
+            console.warn(
+              "Could not convert image to data URL; keeping original image.",
+              error,
+            );
           }
+
+          img.style.display = "block";
+          img.style.visibility = "visible";
+          img.style.opacity = "1";
+        }
+
+        await Promise.all(
+          images.map(async (img) => {
+            try {
+              if (img.decode) {
+                await img.decode();
+              }
+            } catch (_) {}
+
+            if (!img.complete) {
+              await new Promise((resolve) => {
+                const done = () => {
+                  img.removeEventListener("load", done);
+                  img.removeEventListener("error", done);
+                  resolve();
+                };
+
+                img.addEventListener("load", done);
+                img.addEventListener("error", done);
+
+                setTimeout(done, 5000);
+              });
+            }
+          }),
+        );
+
+        return () => {
+          backups.forEach((backup) => {
+            if (backup.src === null) {
+              backup.img.removeAttribute("src");
+            } else {
+              backup.img.setAttribute("src", backup.src);
+            }
+
+            if (backup.srcset === null) {
+              backup.img.removeAttribute("srcset");
+            } else {
+              backup.img.setAttribute("srcset", backup.srcset);
+            }
+
+            if (backup.sizes === null) {
+              backup.img.removeAttribute("sizes");
+            } else {
+              backup.img.setAttribute("sizes", backup.sizes);
+            }
+          });
+        };
+      }
+
+      async function saveReportAsPng() {
+        const button = $("savePng");
+
+        if (!button) return;
+
+        updateHeader();
+
+        const report = document.querySelector(".report");
+
+        if (!report) {
+          showSaveStatus(
+            "error",
+            "PNG could not be saved",
+            "Report preview is not available.",
+            6000,
+          );
+          return;
+        }
+
+        const safeDate = (getReportDate() || getTodayDate()).replace(
+          /[^0-9A-Za-z_-]+/g,
+          "-",
+        );
+
+        const filename = `Daily_Report_${safeDate}.png`;
+        const originalText = button.textContent;
+
+        button.disabled = true;
+        button.textContent = "Saving PNG…";
+
+        document.body.classList.add("png-exporting");
+
+        let restoreImages = null;
+
+        try {
+          /*
+           * ----------------------------------------------------------
+           * 1. SAVE JSON FIRST
+           *
+           * A PNG rendering problem must never stop JSON from saving.
+           * ----------------------------------------------------------
+           */
+          saveIconsForCurrentDate();
+
+          const jsonSaved = await saveReportJson(false);
+
+          /*
+           * ----------------------------------------------------------
+           * 2. WAIT FOR THE SAME ASSETS USED BY THE PREVIEW.
+           * ----------------------------------------------------------
+           */
+          await waitForReportAssets(report);
+
+          /*
+           * ----------------------------------------------------------
+           * 3. Temporarily use data URLs for report images.
+           * ----------------------------------------------------------
+           */
+          restoreImages = await prepareExportImages(report);
+
+          /*
+           * ----------------------------------------------------------
+           * 4. CAPTURE THE LIVE PREVIEW DOM.
+           *
+           * Report design = 1250px wide.
+           * Output = 4096px wide.
+           *
+           * No SVG.
+           * No foreignObject.
+           * No print CSS.
+           * No separate logo resizing.
+           * ----------------------------------------------------------
+           */
+          if (typeof window.html2canvas !== "function") {
+            throw new Error("html2canvas is not available.");
+          }
+
+          const rect = report.getBoundingClientRect();
+
+          const width = 1250;
+
+          const height = Math.max(
+            1,
+            Math.ceil(
+              Math.max(
+                rect.height,
+                report.scrollHeight || 0,
+              ),
+            ),
+          );
+
+          const targetWidth = 4096;
+          const scale = targetWidth / width;
+
+          const canvas = await window.html2canvas(report, {
+            scale,
+
+            width,
+            height,
+
+            x: 0,
+            y: 0,
+
+            backgroundColor: "#fffef9",
+
+            useCORS: true,
+            allowTaint: false,
+
+            imageTimeout: 20000,
+            logging: false,
+
+            scrollX: 0,
+            scrollY: 0,
+
+            onclone: (clonedDocument) => {
+              const clonedReport =
+                clonedDocument.querySelector(".report");
+
+              if (!clonedReport) return;
+
+              /*
+               * EXACT SAME REPORT GEOMETRY AS PREVIEW
+               */
+              clonedReport.style.width = "1250px";
+              clonedReport.style.minWidth = "1250px";
+              clonedReport.style.maxWidth = "1250px";
+
+              clonedReport.style.margin = "0";
+              clonedReport.style.boxShadow = "none";
+              clonedReport.style.overflow = "visible";
+
+              /*
+               * ----------------------------------------------------
+               * SCHOOL LOGO
+               *
+               * The logo keeps exactly the same box and
+               * object-fit behavior as the live preview.
+               * ----------------------------------------------------
+               */
+              const logoWrapper =
+                clonedDocument.querySelector(".logo-wrapper");
+
+              if (logoWrapper) {
+                logoWrapper.style.position = "absolute";
+                logoWrapper.style.left = "0";
+                logoWrapper.style.top = "0";
+
+                logoWrapper.style.width = "171px";
+                logoWrapper.style.height = "141px";
+
+                logoWrapper.style.minWidth = "171px";
+                logoWrapper.style.minHeight = "141px";
+
+                logoWrapper.style.maxWidth = "171px";
+                logoWrapper.style.maxHeight = "141px";
+
+                logoWrapper.style.display = "flex";
+                logoWrapper.style.alignItems = "flex-start";
+                logoWrapper.style.justifyContent = "flex-start";
+
+                logoWrapper.style.overflow = "visible";
+                logoWrapper.style.visibility = "visible";
+                logoWrapper.style.opacity = "1";
+              }
+
+              const logo =
+                clonedDocument.querySelector(
+                  ".school-logo-image",
+                );
+
+              if (logo) {
+                logo.style.display = "block";
+
+                logo.style.width = "171px";
+                logo.style.height = "141px";
+
+                logo.style.minWidth = "171px";
+                logo.style.minHeight = "141px";
+
+                logo.style.maxWidth = "171px";
+                logo.style.maxHeight = "141px";
+
+                logo.style.margin = "0";
+                logo.style.padding = "0";
+
+                logo.style.objectFit = "contain";
+                logo.style.objectPosition = "left top";
+
+                logo.style.flex = "0 0 171px";
+
+                logo.style.visibility = "visible";
+                logo.style.opacity = "1";
+
+                logo.removeAttribute("srcset");
+                logo.removeAttribute("sizes");
+              }
+
+              /*
+               * ----------------------------------------------------
+               * TOP-RIGHT ART
+               * ----------------------------------------------------
+               */
+              const artWrapper =
+                clonedDocument.querySelector(".header-art");
+
+              if (artWrapper) {
+                artWrapper.style.position = "absolute";
+                artWrapper.style.right = "0";
+                artWrapper.style.top = "0";
+
+                artWrapper.style.width = "177px";
+                artWrapper.style.height = "145px";
+
+                artWrapper.style.minWidth = "177px";
+                artWrapper.style.minHeight = "145px";
+
+                artWrapper.style.maxWidth = "177px";
+                artWrapper.style.maxHeight = "145px";
+
+                artWrapper.style.display = "flex";
+                artWrapper.style.alignItems = "flex-start";
+                artWrapper.style.justifyContent = "flex-end";
+
+                artWrapper.style.overflow = "visible";
+                artWrapper.style.visibility = "visible";
+                artWrapper.style.opacity = "1";
+              }
+
+              const art =
+                clonedDocument.querySelector(
+                  ".header-art-image",
+                );
+
+              if (art) {
+                art.style.display = "block";
+
+                art.style.width = "177px";
+                art.style.height = "145px";
+
+                art.style.minWidth = "177px";
+                art.style.minHeight = "145px";
+
+                art.style.maxWidth = "177px";
+                art.style.maxHeight = "145px";
+
+                art.style.margin = "0";
+                art.style.padding = "0";
+
+                art.style.objectFit = "contain";
+                art.style.objectPosition = "right top";
+
+                art.style.visibility = "visible";
+                art.style.opacity = "1";
+
+                art.removeAttribute("srcset");
+                art.removeAttribute("sizes");
+              }
+            },
+          });
+
+          if (
+            !canvas ||
+            canvas.width < 2000 ||
+            canvas.height < 500
+          ) {
+            throw new Error(
+              `Invalid PNG canvas: ${canvas?.width || 0} × ${canvas?.height || 0}`,
+            );
+          }
+
+          await downloadCanvasPng(canvas, filename);
+
+          if (jsonSaved) {
+            showSaveStatus(
+              "success",
+              "PNG + JSON saved successfully",
+              `${filename} saved at 4096px wide • ${safeDate}.json saved`,
+              6000,
+            );
+          } else {
+            showSaveStatus(
+              "error",
+              "PNG saved, but JSON save failed",
+              `${filename} was saved locally. Check the server/Render logs for JSON.`,
+              7000,
+            );
+          }
+        } catch (error) {
+          console.error("PNG export error:", error);
+
+          showSaveStatus(
+            "error",
+            "PNG could not be saved",
+            error.message || "PNG export failed.",
+            7000,
+          );
+        } finally {
+          try {
+            if (typeof restoreImages === "function") {
+              restoreImages();
+            }
+          } catch (restoreError) {
+            console.warn(
+              "Could not restore preview images:",
+              restoreError,
+            );
+          }
+
+          document.body.classList.remove("png-exporting");
+
+          button.disabled = false;
+          button.textContent = originalText;
+        }
       }
 
       /* ============================================================
