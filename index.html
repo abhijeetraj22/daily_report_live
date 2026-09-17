@@ -416,23 +416,27 @@
       }
 
       .school-logo-image {
-        display: block;
-
-        width: 171px;
-        height: 141px;
-
-        max-width: none;
-        max-height: none;
-
-        margin: 0;
-        padding: 0;
-
-        object-fit: contain;
-
-        object-position: left top;
-
-        visibility: visible;
-        opacity: 1;
+          display: block !important;
+      
+          width: 171px !important;
+          height: 141px !important;
+      
+          min-width: 171px !important;
+          min-height: 141px !important;
+      
+          max-width: 171px !important;
+          max-height: 141px !important;
+      
+          margin: 0 !important;
+          padding: 0 !important;
+      
+          object-fit: contain !important;
+          object-position: left top !important;
+      
+          visibility: visible !important;
+          opacity: 1 !important;
+      
+          flex: 0 0 171px !important;
       }
 
       /* ============================================================
@@ -4387,179 +4391,236 @@
         ============================================================ */
 
       async function saveReportAsPng() {
-        const button = $("savePng");
-
-        if (!button) {
-          return;
-        }
-
-        updateHeader();
-
-        const report = document.querySelector(".report");
-
-        if (!report) {
-          alert("Report preview is not available.");
-
-          return;
-        }
-
-        const safeDate = (getReportDate() || getTodayDate()).replace(
-          /[^0-9A-Za-z_-]+/g,
-          "-",
-        );
-
-        const filename = `Daily_Report_${safeDate}.png`;
-
-        const originalText = button.textContent;
-
-        button.disabled = true;
-
-        button.textContent = "Saving PNG…";
-
-        document.body.classList.add("png-exporting");
-
-        try {
-          await waitForReportAssets(report);
-
-          let saved = false;
-
-          /* ====================================================
-                   FIRST OPTION:
-                   HTML2CANVAS
-                ==================================================== */
-
-          if (typeof window.html2canvas === "function") {
-            try {
-              const width = 1250;
-
-              const scale = Math.min(4, Math.max(2, 4096 / width));
-
-              const canvas = await window.html2canvas(report, {
-                scale,
-
-                useCORS: true,
-
-                allowTaint: false,
-
-                backgroundColor: "#fffef9",
-
-                logging: false,
-
-                imageTimeout: 15000,
-
-                width,
-
-                height: report.scrollHeight,
-
-                scrollX: 0,
-
-                scrollY: 0,
-
-                onclone: (clonedDocument) => {
-                  const clonedReport = clonedDocument.querySelector(".report");
-
-                  if (!clonedReport) {
-                    return;
-                  }
-
-                  clonedReport.style.width = "1250px";
-
-                  clonedReport.style.minWidth = "1250px";
-
-                  clonedReport.style.maxWidth = "1250px";
-
-                  clonedReport.style.margin = "0";
-
-                  clonedReport.style.boxShadow = "none";
-
-                  clonedReport.style.overflow = "visible";
-
-                  clonedDocument
-                    .querySelectorAll(".logo-wrapper, .header-art")
-                    .forEach((element) => {
-                      element.style.display = "flex";
-
-                      element.style.visibility = "visible";
-
-                      element.style.opacity = "1";
-                    });
-
-                  clonedDocument
-                    .querySelectorAll(".school-logo-image, .header-art-image")
-                    .forEach((element) => {
-                      element.style.display = "block";
-
-                      element.style.visibility = "visible";
-
-                      element.style.opacity = "1";
-                    });
-                },
-              });
-
-              if (canvas.width < 1000 || canvas.height < 500) {
-                throw new Error("html2canvas returned invalid canvas.");
-              }
-
-              await downloadCanvasPng(canvas, filename);
-
-              saved = true;
-            } catch (error) {
-              console.warn("html2canvas failed. Using native renderer.", error);
-            }
+          const button = $("savePng");
+      
+          if (!button) return;
+      
+          updateHeader();
+      
+          const report = document.querySelector(".report");
+      
+          if (!report) {
+              alert("Report preview is not available.");
+              return;
           }
-
-          /* ====================================================
-                   FALLBACK
-                ==================================================== */
-
-          if (!saved) {
-            await nativePngFallback(report, filename);
-          }
-
-          /* ====================================================
-             SAVE THE SAME CURRENT REPORT DATA TO JSON
-
-             IMPORTANT:
-             Clicking "Save Report as PNG" must ALSO save the exact
-             current report data (including selected icons) to JSON.
-             Keep the browser icon backup synchronized first, then
-             send collectReportData() to the existing JSON endpoint.
-             ==================================================== */
-          saveIconsForCurrentDate();
-
-          const jsonSaved = await saveReportJson(false);
-
-          if (jsonSaved) {
-            /* Reliable in-page confirmation: do not depend on alert(). */
-            showSaveStatus(
-              "success",
-              "PNG + JSON saved successfully",
-              `${filename} saved • ${safeDate}.json saved to daily_report_storage`,
-              6000,
-            );
-          } else {
-            showSaveStatus(
-              "error",
-              "PNG saved, but JSON save failed",
-              "The PNG is saved locally. The JSON could not be saved to the server.",
-              7000,
-            );
-          }
-        } catch (error) {
-          console.error("PNG export error:", error);
-
-          alert(
-            "PNG could not be saved. " +
-              "Please open the page through the FastAPI server " +
-              "and try again.",
+      
+          const safeDate = (getReportDate() || getTodayDate()).replace(
+              /[^0-9A-Za-z_-]+/g,
+              "-"
           );
-        } finally {
-          document.body.classList.remove("png-exporting");
-
-          button.disabled = false;
-
-          button.textContent = originalText;
-        }
+      
+          const filename = `Daily_Report_${safeDate}.png`;
+      
+          const originalText = button.textContent;
+      
+          button.disabled = true;
+          button.textContent = "Saving PNG…";
+      
+          document.body.classList.add("png-exporting");
+      
+          try {
+              await waitForReportAssets(report);
+      
+              if (typeof window.html2canvas !== "function") {
+                  throw new Error("html2canvas is not available.");
+              }
+      
+              /*
+               * IMPORTANT
+               * Capture the report exactly as displayed.
+               * Do NOT rebuild it through SVG/foreignObject.
+               */
+              const reportWidth = 1250;
+      
+              const reportHeight = Math.ceil(
+                  report.getBoundingClientRect().height
+              );
+      
+              /*
+               * 4096px output width.
+               */
+              const scale = 4096 / reportWidth;
+      
+              const canvas = await window.html2canvas(report, {
+                  scale: scale,
+      
+                  width: reportWidth,
+                  height: reportHeight,
+      
+                  backgroundColor: "#fffef9",
+      
+                  useCORS: true,
+                  allowTaint: false,
+      
+                  imageTimeout: 20000,
+      
+                  logging: false,
+      
+                  scrollX: 0,
+                  scrollY: 0,
+      
+                  onclone: (clonedDocument) => {
+      
+                      const clonedReport =
+                          clonedDocument.querySelector(".report");
+      
+                      if (!clonedReport) return;
+      
+                      /*
+                       * KEEP EXACT REPORT GEOMETRY
+                       */
+                      clonedReport.style.width = "1250px";
+                      clonedReport.style.minWidth = "1250px";
+                      clonedReport.style.maxWidth = "1250px";
+      
+                      clonedReport.style.margin = "0";
+                      clonedReport.style.boxShadow = "none";
+                      clonedReport.style.overflow = "visible";
+      
+                      /*
+                       * KEEP SCHOOL LOGO EXACTLY LIKE PREVIEW
+                       */
+                      const logo =
+                          clonedDocument.querySelector(
+                              ".school-logo-image"
+                          );
+      
+                      if (logo) {
+                          logo.style.display = "block";
+                          logo.style.width = "171px";
+                          logo.style.height = "141px";
+      
+                          logo.style.minWidth = "171px";
+                          logo.style.minHeight = "141px";
+      
+                          logo.style.maxWidth = "171px";
+                          logo.style.maxHeight = "141px";
+      
+                          logo.style.objectFit = "contain";
+                          logo.style.objectPosition = "left top";
+      
+                          logo.style.margin = "0";
+                          logo.style.padding = "0";
+      
+                          logo.style.visibility = "visible";
+                          logo.style.opacity = "1";
+      
+                          logo.removeAttribute("srcset");
+                      }
+      
+                      /*
+                       * KEEP TOP-RIGHT ART EXACTLY LIKE PREVIEW
+                       */
+                      const art =
+                          clonedDocument.querySelector(
+                              ".header-art-image"
+                          );
+      
+                      if (art) {
+                          art.style.display = "block";
+                          art.style.width = "177px";
+                          art.style.height = "145px";
+      
+                          art.style.minWidth = "177px";
+                          art.style.minHeight = "145px";
+      
+                          art.style.maxWidth = "177px";
+                          art.style.maxHeight = "145px";
+      
+                          art.style.objectFit = "contain";
+                          art.style.objectPosition = "right top";
+      
+                          art.style.margin = "0";
+                          art.style.padding = "0";
+      
+                          art.style.visibility = "visible";
+                          art.style.opacity = "1";
+      
+                          art.removeAttribute("srcset");
+                      }
+      
+                      /*
+                       * Keep logo and artwork containers unchanged.
+                       */
+                      const logoWrapper =
+                          clonedDocument.querySelector(
+                              ".logo-wrapper"
+                          );
+      
+                      if (logoWrapper) {
+                          logoWrapper.style.display = "flex";
+                          logoWrapper.style.width = "171px";
+                          logoWrapper.style.height = "141px";
+                          logoWrapper.style.left = "0";
+                          logoWrapper.style.top = "0";
+                          logoWrapper.style.visibility = "visible";
+                          logoWrapper.style.opacity = "1";
+                      }
+      
+                      const artWrapper =
+                          clonedDocument.querySelector(
+                              ".header-art"
+                          );
+      
+                      if (artWrapper) {
+                          artWrapper.style.display = "flex";
+                          artWrapper.style.width = "177px";
+                          artWrapper.style.height = "145px";
+                          artWrapper.style.right = "0";
+                          artWrapper.style.top = "0";
+                          artWrapper.style.visibility = "visible";
+                          artWrapper.style.opacity = "1";
+                      }
+                  }
+              });
+      
+              if (!canvas || canvas.width < 2000) {
+                  throw new Error("Invalid PNG canvas generated.");
+              }
+      
+              await downloadCanvasPng(canvas, filename);
+      
+              /*
+               * Save JSON separately.
+               */
+              saveIconsForCurrentDate();
+      
+              const jsonSaved = await saveReportJson(false);
+      
+              if (jsonSaved) {
+                  showSaveStatus(
+                      "success",
+                      "PNG + JSON saved successfully",
+                      `${filename} saved • ${safeDate}.json saved`,
+                      6000
+                  );
+              } else {
+                  showSaveStatus(
+                      "error",
+                      "PNG saved, but JSON save failed",
+                      "The PNG was saved locally, but JSON could not be saved.",
+                      7000
+                  );
+              }
+      
+          } catch (error) {
+      
+              console.error("PNG export error:", error);
+      
+              showSaveStatus(
+                  "error",
+                  "PNG could not be saved",
+                  error.message || "PNG export failed.",
+                  7000
+              );
+      
+          } finally {
+      
+              document.body.classList.remove("png-exporting");
+      
+              button.disabled = false;
+              button.textContent = originalText;
+          }
       }
 
       /* ============================================================
