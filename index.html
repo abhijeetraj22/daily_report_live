@@ -394,55 +394,55 @@
         ============================================================ */
 
       .logo-wrapper {
-        position: absolute;
-
-        left: 0;
-        top: 0;
-
-        width: 171px;
-        height: 141px;
-
-        margin: 0;
-        padding: 0;
-
-        display: flex;
-
-        align-items: flex-start;
-        justify-content: flex-start;
-
-        overflow: visible;
-
-        z-index: 5000;
+          position: absolute;
+      
+          left: 0;
+          top: 0;
+      
+          width: 160px !important;
+          height: 160px !important;
+      
+          margin: 0;
+          padding: 0;
+      
+          display: flex;
+          align-items: flex-start;
+          justify-content: flex-start;
+      
+          /*
+           * IMPORTANT:
+           * Covers the decorative diamond/divider behind the
+           * transparent part of the school logo.
+           */
+          background: var(--paper) !important;
+      
+          overflow: visible;
+      
+          z-index: 5000 !important;
       }
 
       .school-logo-image {
-        display: block !important;
-
-        /* Uploaded school-logo.png is essentially square. */
-        width: 160px !important;
-        height: 160px !important;
-
-        min-width: 160px !important;
-        min-height: 160px !important;
-
-        max-width: 160px !important;
-        max-height: 160px !important;
-
-        margin: 0 !important;
-        padding: 0 !important;
-
-        /*
-         * Do not stretch the uploaded logo.
-         * The image itself is square, so the preview and PNG
-         * both use the exact same 160 x 160 rendered image.
-         */
-        object-fit: contain !important;
-        object-position: left top !important;
-
-        flex: 0 0 160px !important;
-
-        visibility: visible !important;
-        opacity: 1 !important;
+          display: block !important;
+      
+          width: 160px !important;
+          height: 160px !important;
+      
+          min-width: 160px !important;
+          min-height: 160px !important;
+      
+          max-width: 160px !important;
+          max-height: 160px !important;
+      
+          margin: 0 !important;
+          padding: 0 !important;
+      
+          object-fit: contain !important;
+          object-position: left top !important;
+      
+          flex: 0 0 160px !important;
+      
+          visibility: visible !important;
+          opacity: 1 !important;
       }
 
       /* ============================================================
@@ -2343,10 +2343,10 @@
                 <div class="logo-wrapper">
                   <img
                     class="school-logo-image"
-                    src="https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.jpg"
+                    src="https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.png"
                     onerror="
                       this.onerror = null;
-                      this.src = 'https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.png';
+                      this.src = 'https://abhijeetraj22.github.io/daily_report_live/static/images/school-logo.jpg';
                     "
                     alt="Open Minds School Logo"
                   />
@@ -4554,6 +4554,23 @@
             onclone: (clonedDocument) => {
               const clonedReport =
                 clonedDocument.querySelector(".report");
+              const logoWrapper =
+                  clonedDocument.querySelector(".logo-wrapper");
+              
+              if (logoWrapper) {
+                  logoWrapper.style.width = "160px";
+                  logoWrapper.style.height = "160px";
+              
+                  logoWrapper.style.background = "#fffef9";
+              
+                  logoWrapper.style.zIndex = "5000";
+              
+                  logoWrapper.style.display = "flex";
+                  logoWrapper.style.alignItems = "flex-start";
+                  logoWrapper.style.justifyContent = "flex-start";
+              
+                  logoWrapper.style.overflow = "visible";
+              }
 
               if (!clonedReport) return;
 
