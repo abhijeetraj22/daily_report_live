@@ -4040,6 +4040,134 @@
         const t = String(text || "")
           .toLowerCase()
           .trim();
+
+        /* ============================================================
+           HIGH-PRIORITY TASK MATCHING
+           Full task meaning MUST be checked before generic keywords.
+        ============================================================ */
+        
+        /* ------------------------------------------------------------
+           CORRECTION + PRINTED TRANSFER CERTIFICATE
+        ------------------------------------------------------------ */
+        if (
+          t.includes("correction") &&
+          t.includes("transfer certificate")
+        ) {
+          return "mdi:file-document-edit";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           VERIFIED TRANSFER CERTIFICATE
+        ------------------------------------------------------------ */
+        if (
+          (t.includes("verified") || t.includes("verify")) &&
+          t.includes("transfer certificate")
+        ) {
+          return "mdi:certificate-check";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           UPLOADED + UPDATED BIRTH / TRANSFER CERTIFICATE
+        ------------------------------------------------------------ */
+        if (
+          (t.includes("uploaded") || t.includes("upload")) &&
+          (t.includes("updated") || t.includes("update")) &&
+          (
+            t.includes("birth certificate") ||
+            t.includes("transfer certificate")
+          )
+        ) {
+          return "mdi:cloud-upload";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           PRINTED QUESTION PAPER
+        ------------------------------------------------------------ */
+        if (
+          t.includes("printed") &&
+          (
+            t.includes("question paper") ||
+            t.includes("question") ||
+            t.includes("paper")
+          )
+        ) {
+          return "mdi:printer";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           PRINTED SUPERVISION TEACHER ARRIVAL SHEET
+        ------------------------------------------------------------ */
+        if (
+          t.includes("printed") &&
+          t.includes("supervision") &&
+          t.includes("teacher") &&
+          t.includes("arrival") &&
+          t.includes("sheet")
+        ) {
+          return "mdi:printer";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           STAPLED
+        ------------------------------------------------------------ */
+        if (
+          t.includes("stapled") ||
+          t.includes("stapling") ||
+          t.includes("staple")
+        ) {
+          return "mdi:paperclip";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           DISTRIBUTED ANSWER-COPY / PAPERS
+        ------------------------------------------------------------ */
+        if (
+          t.includes("distributed") &&
+          (
+            t.includes("answer-copy") ||
+            t.includes("answer copy") ||
+            t.includes("papers") ||
+            t.includes("bundle")
+          )
+        ) {
+          return "mdi:account-multiple";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           COLLECTED ANSWER-COPY / BUNDLES
+        ------------------------------------------------------------ */
+        if (
+          t.includes("collected") &&
+          (
+            t.includes("answer-copy") ||
+            t.includes("answer copy") ||
+            t.includes("bundle") ||
+            t.includes("bundles")
+          )
+        ) {
+          return "mdi:archive-arrow-down";
+        }
+        
+        
+        /* ------------------------------------------------------------
+           GIVEN ANSWER BUNDLE TO TEACHER
+        ------------------------------------------------------------ */
+        if (
+          t.includes("given") &&
+          t.includes("answer") &&
+          t.includes("bundle") &&
+          t.includes("teacher")
+        ) {
+          return "mdi:account-multiple";
+        }
+      
       
         /* ============================================================
            EXACT / SPECIFIC DAILY REPORT TASKS
