@@ -418,22 +418,28 @@
       .school-logo-image {
         display: block !important;
 
-        width: 171px !important;
+        /* Uploaded school-logo.png is essentially square. */
+        width: 141px !important;
         height: 141px !important;
 
-        min-width: 171px !important;
+        min-width: 141px !important;
         min-height: 141px !important;
 
-        max-width: 171px !important;
+        max-width: 141px !important;
         max-height: 141px !important;
 
         margin: 0 !important;
         padding: 0 !important;
 
+        /*
+         * Do not stretch the uploaded logo.
+         * The image itself is square, so the preview and PNG
+         * both use the exact same 141 x 141 rendered image.
+         */
         object-fit: contain !important;
         object-position: left top !important;
 
-        flex: 0 0 171px !important;
+        flex: 0 0 141px !important;
 
         visibility: visible !important;
         opacity: 1 !important;
@@ -1759,23 +1765,13 @@
         }
 
         .school-logo-image {
-          width: 40.6mm !important;
-
-          height: 33.5mm !important;
-
-          max-width: none !important;
-
-          max-height: none !important;
-
+          width: 141px !important;
+          height: 141px !important;
+          max-width: 141px !important;
+          max-height: 141px !important;
           object-fit: contain !important;
-
           object-position: left top !important;
-
           display: block !important;
-
-          visibility: visible !important;
-
-          opacity: 1 !important;
         }
 
         /* --------------------------------------------------------
@@ -4580,28 +4576,20 @@
               const clonedLogo =
                 clonedDocument.querySelector(".school-logo-image");
 
-              if (clonedLogo && logoRect) {
+              if (clonedLogo) {
                 clonedLogo.style.display = "block";
                 clonedLogo.style.visibility = "visible";
                 clonedLogo.style.opacity = "1";
 
-                clonedLogo.style.width =
-                  `${Math.round(logoRect.width)}px`;
+                /* EXACT SAME GEOMETRY AS LIVE PREVIEW */
+                clonedLogo.style.width = "141px";
+                clonedLogo.style.height = "141px";
 
-                clonedLogo.style.height =
-                  `${Math.round(logoRect.height)}px`;
+                clonedLogo.style.minWidth = "141px";
+                clonedLogo.style.minHeight = "141px";
 
-                clonedLogo.style.minWidth =
-                  `${Math.round(logoRect.width)}px`;
-
-                clonedLogo.style.minHeight =
-                  `${Math.round(logoRect.height)}px`;
-
-                clonedLogo.style.maxWidth =
-                  `${Math.round(logoRect.width)}px`;
-
-                clonedLogo.style.maxHeight =
-                  `${Math.round(logoRect.height)}px`;
+                clonedLogo.style.maxWidth = "141px";
+                clonedLogo.style.maxHeight = "141px";
 
                 clonedLogo.style.objectFit = "contain";
                 clonedLogo.style.objectPosition = "left top";
@@ -4612,6 +4600,9 @@
                 clonedLogo.removeAttribute("srcset");
                 clonedLogo.removeAttribute("sizes");
 
+                /*
+                 * Use the SAME PNG that the live Preview uses.
+                 */
                 if (logoDataUrl) {
                   clonedLogo.src = logoDataUrl;
                 }
@@ -4685,129 +4676,6 @@
             throw new Error(
               `Invalid PNG canvas: ${canvas?.width || 0} × ${canvas?.height || 0}`,
             );
-          }
-
-          /*
-           * ----------------------------------------------------------
-           * FINAL LOGO PIXEL CORRECTION
-           *
-           * html2canvas normally renders the logo correctly. If the
-           * browser's image decoder gives a slightly different result,
-           * redraw only the logo using the SAME source image and the
-           * EXACT Preview rectangle.
-           *
-           * This does NOT stretch the logo.
-           * It performs the same CSS "contain" calculation.
-           * ----------------------------------------------------------
-           */
-          if (logo && logoRect && logoSource) {
-            try {
-              const image = new Image();
-
-              image.decoding = "async";
-              image.crossOrigin = "anonymous";
-
-              image.src = logoDataUrl || logoSource;
-
-              await new Promise((resolve, reject) => {
-                if (image.complete && image.naturalWidth > 0) {
-                  resolve();
-                  return;
-                }
-
-                image.onload = resolve;
-                image.onerror = reject;
-
-                setTimeout(
-                  () => reject(
-                    new Error("School logo could not be decoded.")
-                  ),
-                  10000,
-                );
-              });
-
-              /*
-               * Coordinates relative to the report.
-               */
-              const x =
-                (logoRect.left - reportRect.left) * scale;
-
-              const y =
-                (logoRect.top - reportRect.top) * scale;
-
-              const boxWidth =
-                logoRect.width * scale;
-
-              const boxHeight =
-                logoRect.height * scale;
-
-              /*
-               * CSS object-fit: contain calculation.
-               */
-              const imageRatio =
-                image.naturalWidth / image.naturalHeight;
-
-              const boxRatio =
-                boxWidth / boxHeight;
-
-              let drawWidth;
-              let drawHeight;
-
-              if (imageRatio > boxRatio) {
-                drawWidth = boxWidth;
-                drawHeight = boxWidth / imageRatio;
-              } else {
-                drawHeight = boxHeight;
-                drawWidth = boxHeight * imageRatio;
-              }
-
-              /*
-               * object-position: left top
-               */
-              const drawX = x;
-              const drawY = y;
-
-              const ctx = canvas.getContext("2d");
-
-              if (!ctx) {
-                throw new Error("Canvas 2D context unavailable.");
-              }
-
-              /*
-               * Clear only the logo's exact rectangle, then redraw
-               * the logo with preserved aspect ratio.
-               *
-               * The report background in this area is white.
-               */
-              ctx.save();
-
-              ctx.fillStyle = "#fffef9";
-              ctx.fillRect(
-                x,
-                y,
-                boxWidth,
-                boxHeight,
-              );
-
-              ctx.drawImage(
-                image,
-                0,
-                0,
-                image.naturalWidth,
-                image.naturalHeight,
-                drawX,
-                drawY,
-                drawWidth,
-                drawHeight,
-              );
-
-              ctx.restore();
-            } catch (logoError) {
-              console.warn(
-                "Final school-logo pixel correction skipped:",
-                logoError,
-              );
-            }
           }
 
           await downloadCanvasPng(canvas, filename);
