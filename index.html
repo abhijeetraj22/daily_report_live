@@ -4575,8 +4575,19 @@
       
       function getEffectiveIcon(item) {
         const text = String(item?.text || "").trim();
+        const normalizedText = text.toLowerCase();
 
-        /* User-selected icon always wins. */
+        /*
+         * COLLECTED NOTEBOOKS — fixed semantic mapping.
+         * This MUST be checked before localStorage/manual overrides so an
+         * older saved icon (such as archive-arrow-down) cannot keep coming
+         * back for this exact task sentence.
+         */
+        if (normalizedText.includes("collected notebooks")) {
+          return "mdi:notebook-check-outline";
+        }
+
+        /* User-selected icon always wins for all other descriptions. */
         const manualIcon = state.iconOverrides[item.key];
         if (manualIcon && !isGenericClipboardIcon(manualIcon)) {
           return manualIcon;
