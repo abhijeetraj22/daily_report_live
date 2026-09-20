@@ -4697,17 +4697,32 @@
       function getForcedSentenceIcon(text) {
   const t = normalizeIconDescription(text);
 
-  /* Exact/near-exact sentence fixes. These are checked before the CSV
-     lookup so small punctuation/spacing differences cannot cause the
-     selected sentence icon to fall back to a generic icon. */
-  if (t.includes("bus scanning duty (r-56)")) return "mdi:qrcode-scan";
+  /* FIRST-WORD ACTION ICONS requested by the user.
+     These are checked before CSV/manual/semantic/server icons so the
+     requested action icon cannot fall back to a generic check mark. */
+  if (t.includes("distributed the q/a for dream-big exams")) return "mdi:send-outline";
+  if (t.includes("distributed the q/a for mid-term exam")) return "mdi:send-outline";
+  if (t.includes("collected the answer copy for mid-term exams")) return "mdi:download-outline";
+  if (t.includes("verified a transfer certificate given by front desk")) return "mdi:certificate-outline";
+  if (t.includes("stapled the maths questions paper for grade x for the dream-big exams")) return "mdi:pin-outline";
+  if (t.includes("stapled the numeracy questions paper for grade k1 & hindi questions paper for grade k2 for the mid-term exams")) return "mdi:pin-outline";
+  if (t.includes("stapled the hindi questions paper for grade 2 and 5 & maths questions paper for grade 5 for the mid-term exams")) return "mdi:pin-outline";
+
+  /* Every Bus Scanning Duty sentence uses the same QR-scanning icon
+     as the existing Bus Scanning entries. */
+  if (t.includes("bus scanning duty")) return "mdi:qrcode-scan";
+
+  /* Preserve all previously requested exact sentence mappings. */
   if (t.includes("distributed the q/a for dream-big exams")) return "mdi:file-document-send-outline";
   if (t.includes("stapled the sanskrit questions paper for grade x for grade 10 for the dream-big exams")) return "mdi:pin-outline";
-  if (t.includes("verified a transfer certificate given by front desk")) return "mdi:certificate-check";
   if (t.includes("distributed the q/a & extra sheets for dream-big exams")) return "mdi:file-multiple-outline";
   if (t.includes("stapled the ela questions paper for grade 4, evs questions paper for grade 3 and hindi questions paper for grade 1 for the mid-term exams")) return "mdi:paperclip";
   if (t.includes("verified a transfer certificate.")) return "mdi:certificate-outline";
   if (t.includes("verified the few transfer certificate")) return "mdi:file-certificate-outline";
+  if (t.includes("stapled the science set-i & ii questions paper for grade ix for the mid-term exams")) return "mdi:pin-outline";
+  if (t.includes("printed & stapled the hindi questions paper for grade x for grade 10 for the dream-big exams")) return "mdi:pin-outline";
+  if (t.includes("distributed the q/a papers for the mid-term examination")) return "mdi:file-send";
+  if (t.includes("collected the answer copies after the mid-term examination")) return "mdi:file-download";
 
   return "";
 }
