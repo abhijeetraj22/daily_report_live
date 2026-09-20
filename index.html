@@ -4710,7 +4710,12 @@
 
   /* FIRST-WORD ACTION ICONS requested by the user.
      These are checked before CSV/manual/semantic/server icons so the
-     requested action icon cannot fall back to a generic check mark. */
+     requested action icon cannot fall back to a generic check mark.
+     Any sentence whose first word is Distributed uses the distribution icon.
+     Any sentence whose first word is Collected uses the collection icon. */
+  if (t.startsWith("distributed ")) return "mdi:send-outline";
+  if (t.startsWith("collected ")) return "mdi:download-outline";
+
   if (t.includes("distributed the q/a for dream-big exams")) return "mdi:send-outline";
   if (t.includes("distributed the q/a for mid-term exam")) return "mdi:send-outline";
   if (t.includes("collected the answer copy for mid-term exams")) return "mdi:download-outline";
