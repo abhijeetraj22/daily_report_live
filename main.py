@@ -965,14 +965,14 @@ async def icon_svg(
     if ":" not in name:
         name = f"mdi:{name}"
 
-    encoded = urllib.parse.quote(
-        name,
-        safe=""
-    )
+    # Iconify SVG API expects /{prefix}/{icon}.svg, not an encoded "prefix:icon".
+    # Example: mdi:printer -> https://api.iconify.design/mdi/printer.svg
+    prefix, icon_name = name.split(":", 1)
+    encoded_prefix = urllib.parse.quote(prefix, safe="")
+    encoded_icon = urllib.parse.quote(icon_name, safe="")
 
     url = (
-        f"https://api.iconify.design/"
-        f"{encoded}.svg"
+        f"https://api.iconify.design/{encoded_prefix}/{encoded_icon}.svg"
         "?height=1em"
         "&width=1em"
     )
